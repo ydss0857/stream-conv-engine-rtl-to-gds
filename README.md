@@ -23,9 +23,12 @@ Builds on [Pynq-Z2_VideoP](https://github.com/Antonioio95/Pynq-Z2_VideoP), the H
 | | |
 |---|---|
 | FPGA (xc7z020-1, out of context) | 820 LUTs, 824 FFs, 1 BRAM36, 18 DSP48s, meets 150 MHz (+0.62 ns) |
-| Verification | 29 cocotb tests across 6 testbenches + 14 model tests; end-to-end output bit-exact with the Python model on real images |
+| Simulation | 32 cocotb tests on Icarus and Verilator; 1.89 M output pixels bit-exact with the Python model, including two 1280×720 frames |
+| Formal | Unbounded proofs of every interface protocol (skid buffer, AXI4-Lite registers, window generator); bounded proof of window contents |
+| Coverage | 100 % line, branch, expression and toggle (82 documented waivers) |
+| Mutation testing | 14 injected bugs, all caught |
 
-Architecture, bit widths, register map: [docs/spec.md](docs/spec.md).
+Architecture, bit widths, register map: [docs/spec.md](docs/spec.md). Verification details and limitations: [docs/verification.md](docs/verification.md).
 
 ## RTL
 
@@ -42,11 +45,13 @@ Architecture, bit widths, register map: [docs/spec.md](docs/spec.md).
 
 ```bash
 source ~/venvs/sce/bin/activate
-cd tb/top && make            # or tb/skid, tb/window, tb/datapath, tb/regs
+cd tb/top && make            # or tb/skid, tb/window, tb/datapath, tb/regs; SIM=verilator also works
 cd model && python -m pytest
+cd tb && ./run_coverage.sh   # all testbenches under Verilator + coverage report
+cd formal/skid && sby -f skid.sby   # also formal/regs, formal/window
 ```
 
-Requires Icarus Verilog 12+ and Python with `cocotb`, `numpy`, `scipy`, `scikit-image`, `matplotlib`.
+Requires Icarus Verilog 12+ and Python with `cocotb`, `numpy`, `scipy`, `scikit-image`, `matplotlib`. Coverage needs Verilator ≥ 5.036; formal needs Yosys and SymbiYosys. Full tool versions are in [docs/verification.md](docs/verification.md#7-reproducing).
 
 ## Plan
 
@@ -55,7 +60,7 @@ Requires Icarus Verilog 12+ and Python with `cocotb`, `numpy`, `scipy`, `scikit-
 | 0 ✅ | Tool setup; fix backpressure in `grayscale_axis`; first cocotb testbench |
 | 1 ✅ | Python golden model, fixed-point analysis, block diagram |
 | 2 ✅ | RTL: line buffers, 3×3 window, convolution datapath, skid buffers, AXI4-Lite registers |
-| 3 | Verification: bit-exact image tests, randomized backpressure, formal proofs, coverage |
+| 3 ✅ | Verification: bit-exact image tests, randomized backpressure, formal proofs, coverage |
 | 4 | FPGA integration and live HDMI demo on PYNQ-Z2 |
 | 5 | ASIC flow (OpenLane 2, open PDK): GDS, PPA study, FPGA vs ASIC comparison |
 | 6 | Write-up and technical report |
