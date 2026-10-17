@@ -20,10 +20,16 @@ class AxisSource:
         self.rng = random.Random(seed)
         self.valid.value = 0
 
+    def _idle(self):
+        """tvalid low, payload scrambled: the sink must ignore data when tvalid is low."""
+        self.valid.value = 0
+        for sig in self.fields.values():
+            sig.value = self.rng.getrandbits(len(sig))
+
     async def send(self, beats):
         for beat in beats:
             while self.rng.random() < self.idle_prob:
-                self.valid.value = 0
+                self._idle()
                 await RisingEdge(self.clk)
             for name, sig in self.fields.items():
                 sig.value = beat[name]
@@ -31,7 +37,7 @@ class AxisSource:
             await RisingEdge(self.clk)
             while not self.ready.value:
                 await RisingEdge(self.clk)
-        self.valid.value = 0
+        self._idle()
 
 
 class AxisSink:

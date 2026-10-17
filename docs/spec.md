@@ -90,6 +90,9 @@ Frame size comes from the `WIDTH` and `HEIGHT` registers. Incoming `tlast` and `
 | 0x14 | HEIGHT | [11:0] lines per frame | |
 | 0x20–0x28 | K0_ROW0..2 | [7:0] col0, [15:8] col1, [23:16] col2, each s8 | |
 | 0x30–0x38 | K1_ROW0..2 | same | |
+| 0x3C | ID | read-only `0x434F4E56` ("CONV") | Lets software confirm it found the engine |
+
+Reset state: filter disabled (luma passes through), K0 = identity, 1280 × 720, threshold 128. Unlisted offsets read 0 and ignore writes. Byte strobes are honoured. All responses are OKAY.
 
 All configuration is copied into shadow registers at **start of frame** (`tuser`), so software can change filters mid-frame without tearing.
 
