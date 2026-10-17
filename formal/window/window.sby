@@ -1,0 +1,44 @@
+# Formal verification of rtl/conv_window.v (+ line_ram.v)
+#
+#   proto_prove : AXI4-Stream rules, tuser/tlast framing, no false error flag;
+#                 unbounded proof (ABC PDR), frames up to 3x3
+#   data_bmc    : adds the window-contents property (every window holds the
+#                 right pixels, with edge replication); bounded, frames up to
+#                 3x2, 24 cycles
+#   data_cover  : a full 3x2 frame completes at step 16, so the 24-cycle bound
+#                 covers a whole frame plus the next one's start
+#
+# MAX_WIDTH is reduced to 8 (AW 3); the logic is the same as the 2048 build.
+# Engine notes: smtbmc + z3 needed >6 min per step by step 14 with the data
+# property on 3x3 frames; ABC's bit-level engines suit this design better.
+# "aigsmt z3" replays ABC counterexamples with z3 (yices is not installed).
+
+[tasks]
+proto_prove
+data_bmc
+data_cover
+
+[options]
+proto_prove: mode prove
+data_bmc: mode bmc
+data_bmc: depth 24
+data_cover: mode cover
+data_cover: depth 24
+aigsmt z3
+
+[engines]
+proto_prove: abc pdr
+data_bmc: abc bmc3
+data_cover: smtbmc z3
+
+[script]
+proto_prove: read -formal line_ram.v conv_window.v
+data_bmc: read -formal -DFORMAL_DATA -DF_MAXH=2 line_ram.v conv_window.v
+data_cover: read -formal -DFORMAL_DATA -DF_MAXH=2 line_ram.v conv_window.v
+chparam -set MAX_WIDTH 8 -set AW 3 conv_window
+prep -top conv_window
+memory_map
+
+[files]
+../../rtl/line_ram.v
+../../rtl/conv_window.v

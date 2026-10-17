@@ -23,9 +23,7 @@ results.xml
 *.fst
 __pycache__/
 .venv/
-formal/**/*_prove/
-formal/**/*_bmc/
-formal/**/*_cover/
+formal/*/*/
 
 # ASIC flow outputs
 asic/runs/

@@ -187,4 +187,119 @@ module conv_window #(
             m_last <= b_last;
         end
     end
+
+`ifdef FORMAL
+    // ---------------------------------------------------------------------
+    // Formal properties (SymbiYosys: formal/window). Run with a small
+    // MAX_WIDTH and small frames (F_MAXW x F_MAXH).
+    //   default      : AXI4-Stream rules, framing, no false error
+    //   FORMAL_DATA  : additionally, every window holds the right pixels
+    // ---------------------------------------------------------------------
+`ifndef F_MAXW
+`define F_MAXW 3
+`endif
+`ifndef F_MAXH
+`define F_MAXH 3
+`endif
+    reg f_past_valid = 1'b0;
+    always @(posedge clk) f_past_valid <= 1'b1;
+    always @(*) if (!f_past_valid) assume(!rstn);
+
+    // Static, small configuration; error flag never cleared by software.
+    always @(*) begin
+        assume(cfg_width  >= 1 && cfg_width  <= `F_MAXW);
+        assume(cfg_height >= 1 && cfg_height <= `F_MAXH);
+        assume(!err_clr);
+    end
+    always @(posedge clk) if (f_past_valid)
+        assume(cfg_width == $past(cfg_width) && cfg_height == $past(cfg_height));
+
+    // Upstream obeys AXI4-Stream and sends well-formed frames.
+    always @(posedge clk)
+        if (f_past_valid && $past(rstn) && $past(s_valid && !s_ready))
+            assume(s_valid && s_data == $past(s_data) && s_user == $past(s_user) && s_last == $past(s_last));
+
+    reg [3:0] f_ir, f_ic;     // input position of the next beat
+    reg       f_ifr;          // input frame parity
+    wire      f_s_fire = s_valid && s_ready;
+    always @(*) if (s_valid) begin
+        assume(s_user == (f_ir == 0 && f_ic == 0));
+        assume(s_last == (f_ic == cfg_width - 1));
+    end
+    always @(posedge clk) begin
+        if (!rstn) begin
+            f_ir <= 0; f_ic <= 0; f_ifr <= 0;
+        end else if (f_s_fire) begin
+            if (f_ic == cfg_width - 1) begin
+                f_ic <= 0;
+                if (f_ir == cfg_height - 1) begin f_ir <= 0; f_ifr <= !f_ifr; end
+                else f_ir <= f_ir + 1;
+            end else f_ic <= f_ic + 1;
+        end
+    end
+
+    // Downstream sees AXI4-Stream: offered beats are held.
+    always @(posedge clk)
+        if (f_past_valid && $past(rstn) && rstn && $past(m_valid && !m_ready))
+            assert(m_valid && m_data == $past(m_data) && m_user == $past(m_user) && m_last == $past(m_last));
+
+    // Well-formed input never raises the error flag.
+    always @(*) if (rstn) assert(!err);
+
+    // Output framing: tuser on the first window of each frame, tlast on each line end.
+    reg [3:0] f_or, f_oc;
+    reg       f_ofr;
+    wire      f_m_fire = m_valid && m_ready;
+    always @(posedge clk) begin
+        if (!rstn) begin
+            f_or <= 0; f_oc <= 0; f_ofr <= 0;
+        end else if (f_m_fire) begin
+            if (f_oc == cfg_width - 1) begin
+                f_oc <= 0;
+                if (f_or == cfg_height - 1) begin f_or <= 0; f_ofr <= !f_ofr; end
+                else f_or <= f_or + 1;
+            end else f_oc <= f_oc + 1;
+        end
+    end
+    always @(*) if (rstn && m_valid) begin
+        assert(m_user == (f_or == 0 && f_oc == 0));
+        assert(m_last == (f_oc == cfg_width - 1));
+    end
+
+`ifdef FORMAL_DATA
+    // Window contents: track one arbitrary pixel position per frame parity and
+    // check every output window that should contain it.
+    (* anyconst *) reg [3:0] f_pr, f_pc;
+    always @(*) assume(f_pr < cfg_height && f_pc < cfg_width);
+    reg [7:0] f_pix [0:1];
+    reg [1:0] f_have;
+    always @(posedge clk) begin
+        if (!rstn) f_have <= 2'b00;
+        else if (f_s_fire && f_ir == f_pr && f_ic == f_pc) begin
+            f_pix[f_ifr]  <= s_data;
+            f_have[f_ifr] <= 1'b1;
+        end
+    end
+
+    function [3:0] clampi(input signed [5:0] v, input [3:0] n);
+        clampi = (v < 0) ? 4'd0 : (v >= $signed({2'b0, n})) ? n - 4'd1 : v[3:0];
+    endfunction
+
+    genvar f_k;
+    generate for (f_k = 0; f_k < 9; f_k = f_k + 1) begin : g_fwin
+        wire [3:0] sr = clampi($signed({2'b0, f_or}) + (f_k / 3) - 1, cfg_height);
+        wire [3:0] sc = clampi($signed({2'b0, f_oc}) + (f_k % 3) - 1, cfg_width);
+        always @(*)
+            if (rstn && m_valid && sr == f_pr && sc == f_pc)
+                assert(f_have[f_ofr] && m_data[8*f_k +: 8] == f_pix[f_ofr]);
+    end endgenerate
+
+`endif
+
+    // Reachability: a largest-size frame completes, and the next one starts.
+    always @(posedge clk) if (rstn) begin
+        cover(f_m_fire && m_last && f_or == cfg_height - 1 && cfg_width == `F_MAXW && cfg_height == `F_MAXH);
+        cover(f_m_fire && f_ofr && m_user);
+    end
+`endif
 endmodule
