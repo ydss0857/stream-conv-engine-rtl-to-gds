@@ -100,8 +100,8 @@ All configuration is copied into shadow registers at **start of frame** (`tuser`
 | Throughput | 1 pixel/clock (minus flush cycles) |
 | Clock | 150 MHz on xc7z020-1 |
 | Max frame width | `MAX_WIDTH` parameter: 2048 on FPGA, smaller on ASIC (§8) |
-| Latency | One line + about 6 pipeline stages |
-| FPGA resources | Estimated 2 BRAM18 for line buffers; ≤ 18 DSP48s (or LUT multipliers) |
+| Latency | One line + 1 pixel (window) + 9 cycles (datapath, 8 register stages) |
+| FPGA resources (per block, routed out of context) | `conv_window`: 1 BRAM36, 102 LUTs, 200 FFs, +1.36 ns slack at 150 MHz. `conv_datapath`: 18 DSP48s, 460 LUTs, 320 FFs, +0.92 ns slack |
 
 ## 8. Open questions and PPA study variables (Phase 5)
 
