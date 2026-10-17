@@ -1,0 +1,31 @@
+# Vivado generated / cache
+.Xil/
+.vivado-ai/
+fpga/NA/
+fpga/*.cache/
+fpga/*.gen/
+fpga/*.hw/
+fpga/*.ip_user_files/
+fpga/*.runs/
+fpga/*.sim/
+fpga/*.tmp/
+*.log
+*.jou
+*.backup.*
+hs_err_pid*
+*.dmp
+*.str
+
+# Simulation / verification outputs
+sim_build/
+results.xml
+*.vcd
+*.fst
+__pycache__/
+.venv/
+formal/**/*_prove/
+formal/**/*_bmc/
+formal/**/*_cover/
+
+# ASIC flow outputs
+asic/runs/
