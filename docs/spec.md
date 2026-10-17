@@ -1,6 +1,6 @@
 # Streaming Convolution Engine: Architecture Spec (Phase 1)
 
-Status: draft. The bit-exact reference is [`model/conv_model.py`](../model/conv_model.py); where this document and the model disagree, the model wins and this document gets fixed.
+Status: Phase 1 complete. Confirmed decisions: programmable two-lane engine; FPGA demo at 720p60 with `MAX_WIDTH` = 2048. The bit-exact reference is [`model/conv_model.py`](../model/conv_model.py); where this document and the model disagree, the model wins and this document gets fixed.
 
 ## 1. What it does
 
