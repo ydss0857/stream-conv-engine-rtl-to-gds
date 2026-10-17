@@ -1,0 +1,25 @@
+# Formal verification of rtl/axis_skid.v
+#   sby -f skid.sby          run all tasks
+#   prove : unbounded proof (k-induction) of every assert
+#   cover : find a trace reaching every cover statement
+
+[tasks]
+prove
+cover
+
+[options]
+prove: mode prove
+prove: depth 8
+cover: mode cover
+cover: depth 20
+
+[engines]
+smtbmc z3
+
+[script]
+read -formal axis_skid.v
+chparam -set DATA_W 4 axis_skid
+prep -top axis_skid
+
+[files]
+../../rtl/axis_skid.v

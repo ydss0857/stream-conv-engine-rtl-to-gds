@@ -1,0 +1,23 @@
+# Formal verification of rtl/conv_regs.v (AXI4-Lite protocol + spot checks)
+#   prove : unbounded proof (k-induction) of every assert
+#   cover : find a trace reaching every cover statement
+
+[tasks]
+prove
+cover
+
+[options]
+prove: mode prove
+prove: depth 6
+cover: mode cover
+cover: depth 12
+
+[engines]
+smtbmc z3
+
+[script]
+read -formal conv_regs.v
+prep -top conv_regs
+
+[files]
+../../rtl/conv_regs.v

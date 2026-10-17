@@ -59,4 +59,73 @@ module axis_skid #(
         if (!main_free && s_fire)
             skid_data <= s_data;
     end
+
+`ifdef FORMAL
+    // ---------------------------------------------------------------------
+    // Formal properties (SymbiYosys: formal/skid). Ignored by other tools.
+    // ---------------------------------------------------------------------
+    reg f_past_valid = 1'b0;
+    always @(posedge clk) f_past_valid <= 1'b1;
+
+    // Start in reset.
+    always @(*) if (!f_past_valid) assume(!rstn);
+
+    // Upstream obeys AXI4-Stream: a beat offered and not taken is held.
+    always @(posedge clk)
+        if (f_past_valid && $past(rstn) && $past(s_valid && !s_ready))
+            assume(s_valid && s_data == $past(s_data));
+
+    // Downstream sees AXI4-Stream: a beat offered and not taken is held.
+    always @(posedge clk)
+        if (f_past_valid && $past(rstn) && rstn && $past(m_valid && !m_ready))
+            assert(m_valid && m_data == $past(m_data));
+
+    // Reset empties the buffer.
+    always @(posedge clk)
+        if (f_past_valid && !$past(rstn))
+            assert(!m_valid && !skid_valid);
+
+    // The skid entry is only ever used behind a full main entry.
+    always @(*) if (rstn && skid_valid) assert(m_valid);
+
+    // Data integrity: track one arbitrary beat (the solver picks which) and
+    // prove it leaves intact and in order. Because the index is arbitrary,
+    // this covers every beat: nothing is dropped, duplicated, reordered or
+    // corrupted.
+    (* anyconst *) reg [3:0] f_idx;
+    reg [3:0]        f_in_cnt, f_out_cnt;
+    reg [DATA_W-1:0] f_data;
+    wire [3:0] f_occ = f_in_cnt - f_out_cnt;     // beats inside the buffer
+    wire [3:0] f_pos = f_idx - f_out_cnt;        // tracked beat's place in the queue
+    wire       f_pending = (f_pos < f_occ);      // tracked beat is inside
+
+    always @(posedge clk) begin
+        if (!rstn) begin
+            f_in_cnt  <= 4'd0;
+            f_out_cnt <= 4'd0;
+        end else begin
+            if (s_fire) f_in_cnt <= f_in_cnt + 4'd1;
+            if (m_valid && m_ready) f_out_cnt <= f_out_cnt + 4'd1;
+            if (s_fire && f_in_cnt == f_idx) f_data <= s_data;
+        end
+    end
+
+    always @(*) begin
+        if (rstn && f_past_valid) begin
+            assert(f_occ == {3'd0, m_valid} + {3'd0, skid_valid});
+            if (f_pending && f_pos == 4'd0) assert(m_valid && m_data == f_data);
+            if (f_pending && f_pos == 4'd1) assert(skid_valid && skid_data == f_data);
+            if (m_valid && m_ready && f_out_cnt == f_idx) assert(f_pending && m_data == f_data);
+        end
+    end
+
+    // Reachability: the interesting states actually happen.
+    always @(posedge clk) begin
+        if (rstn) begin
+            cover(skid_valid);                                   // skid entry used
+            cover(f_past_valid && $past(skid_valid) && !skid_valid && m_valid); // and drained
+            cover(f_out_cnt == 4'd5);                            // a stream of beats
+        end
+    end
+`endif
 endmodule

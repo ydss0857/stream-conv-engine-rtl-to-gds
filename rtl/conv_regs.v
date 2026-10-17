@@ -204,4 +204,100 @@ module conv_regs (
             s_axi_rvalid <= 1'b0;
         end
     end
+
+`ifdef FORMAL
+    // ---------------------------------------------------------------------
+    // Formal properties (SymbiYosys: formal/regs). Ignored by other tools.
+    // ---------------------------------------------------------------------
+    reg f_past_valid = 1'b0;
+    always @(posedge clk) f_past_valid <= 1'b1;
+    always @(*) if (!f_past_valid) assume(!rstn);
+
+    wire f_b_fire  = s_axi_bvalid && s_axi_bready;
+    wire f_ar_fire = s_axi_arvalid && s_axi_arready;
+    wire f_r_fire  = s_axi_rvalid && s_axi_rready;
+
+    // The master obeys AXI4-Lite: requests offered and not taken are held.
+    always @(posedge clk) if (f_past_valid && $past(rstn)) begin
+        if ($past(s_axi_awvalid && !s_axi_awready))
+            assume(s_axi_awvalid && s_axi_awaddr == $past(s_axi_awaddr));
+        if ($past(s_axi_wvalid && !s_axi_wready))
+            assume(s_axi_wvalid && s_axi_wdata == $past(s_axi_wdata) && s_axi_wstrb == $past(s_axi_wstrb));
+        if ($past(s_axi_arvalid && !s_axi_arready))
+            assume(s_axi_arvalid && s_axi_araddr == $past(s_axi_araddr));
+    end
+
+    // Responses offered and not taken are held.
+    always @(posedge clk) if (f_past_valid && $past(rstn) && rstn) begin
+        if ($past(s_axi_bvalid && !s_axi_bready)) assert(s_axi_bvalid);
+        if ($past(s_axi_rvalid && !s_axi_rready))
+            assert(s_axi_rvalid && s_axi_rdata == $past(s_axi_rdata));
+    end
+
+    // Transaction counting: every AW and every W produce exactly one B, and
+    // every AR exactly one R; at most one of each outstanding.
+    reg [1:0] f_aw, f_w, f_b, f_ar, f_r;
+    always @(posedge clk) begin
+        if (!rstn) begin
+            {f_aw, f_w, f_b, f_ar, f_r} <= 10'd0;
+        end else begin
+            if (aw_fire)   f_aw <= f_aw + 2'd1;
+            if (w_fire)    f_w  <= f_w  + 2'd1;
+            if (f_b_fire)  f_b  <= f_b  + 2'd1;
+            if (f_ar_fire) f_ar <= f_ar + 2'd1;
+            if (f_r_fire)  f_r  <= f_r  + 2'd1;
+        end
+    end
+
+    always @(*) if (rstn && f_past_valid) begin
+        assert(f_aw - f_b == {1'b0, aw_held} + {1'b0, s_axi_bvalid});
+        assert(f_w  - f_b == {1'b0, w_held}  + {1'b0, s_axi_bvalid});
+        assert(f_ar - f_r == {1'b0, s_axi_rvalid});
+        assert(!(s_axi_bvalid && (aw_held || w_held)));
+        assert(s_axi_bresp == 2'b00 && s_axi_rresp == 2'b00);
+    end
+
+    // Functional spot checks, using address/data captured independently from
+    // the bus handshakes (not the design's own muxes).
+    reg [5:0]  f_awaddr;
+    reg [31:0] f_wdata;
+    reg [3:0]  f_wstrb;
+    always @(posedge clk) begin
+        if (aw_fire) f_awaddr <= s_axi_awaddr;
+        if (w_fire) begin
+            f_wdata <= s_axi_wdata;
+            f_wstrb <= s_axi_wstrb;
+        end
+    end
+    // Induction invariants: the checker's copies match the design's held copies.
+    always @(*) if (rstn && f_past_valid) begin
+        if (aw_held) assert(f_awaddr == aw_addr);
+        if (w_held)  assert(f_wdata == w_data && f_wstrb == w_strb);
+    end
+
+    wire [5:0]  f_wa = aw_fire ? s_axi_awaddr : f_awaddr;
+    wire [31:0] f_wd = w_fire  ? s_axi_wdata  : f_wdata;
+    wire [3:0]  f_ws = w_fire  ? s_axi_wstrb  : f_wstrb;
+
+    // A full-strobe write to CTRL lands in the register.
+    always @(posedge clk)
+        if (f_past_valid && $past(rstn) && rstn && $past(do_wr) && $past(f_wa[5:2]) == 4'h0 && $past(f_ws) == 4'hF)
+            assert(ctrl == $past(f_wd[3:0]));
+    // A read of WIDTH returns the value the register held when the read was accepted.
+    always @(posedge clk)
+        if (f_past_valid && $past(rstn) && rstn && $past(f_ar_fire) && $past(s_axi_araddr[5:2]) == 4'h4)
+            assert(s_axi_rdata == {20'd0, $past(width)});
+    // The clear pulse only follows a write of 1 to STATUS bit 0.
+    always @(posedge clk)
+        if (f_past_valid && $past(rstn) && rstn && frame_err_clr)
+            assert($past(do_wr) && $past(wa[5:2]) == 4'h1 && $past(ws[0]) && $past(wd[0]));
+
+    // Reachability.
+    always @(posedge clk) if (rstn) begin
+        cover(f_b_fire && f_past_valid && $past(w_held));    // data arrived before address
+        cover(f_b_fire && f_past_valid && $past(aw_held));   // address arrived before data
+        cover(f_r_fire && s_axi_rdata == ID);                // ID read back
+        cover(frame_err_clr);
+    end
+`endif
 endmodule
