@@ -16,13 +16,45 @@ Builds on [Pynq-Z2_VideoP](https://github.com/Antonioio95/Pynq-Z2_VideoP), the H
 | `asic/` | OpenLane 2 flow configuration and PPA results |
 | `docs/` | Architecture diagrams and the technical report |
 
+![RTL simulation output](docs/img/rtl_sim_astronaut.png)
+
+## Status
+
+| | |
+|---|---|
+| FPGA (xc7z020-1, out of context) | 820 LUTs, 824 FFs, 1 BRAM36, 18 DSP48s, meets 150 MHz (+0.62 ns) |
+| Verification | 29 cocotb tests across 6 testbenches + 14 model tests; end-to-end output bit-exact with the Python model on real images |
+
+Architecture, bit widths, register map: [docs/spec.md](docs/spec.md).
+
+## RTL
+
+| File | Block |
+|---|---|
+| `rtl/conv_engine.v` | Top level: AXI4-Stream video in/out, AXI4-Lite control |
+| `rtl/axis_skid.v` | Two-entry skid buffer (registered `tready`, full throughput) |
+| `rtl/luma_axis.v` | RGB → 8-bit luma, 2-stage pipeline |
+| `rtl/conv_window.v`, `rtl/line_ram.v` | Line buffers + 3×3 window generator, edge replication, framing checks |
+| `rtl/conv_datapath.v`, `rtl/mul_u8s8.v` | Two 3×3 MAC lanes, combine / saturate / threshold, 8-stage pipeline |
+| `rtl/conv_regs.v` | AXI4-Lite register block |
+
+## Running the tests (WSL / Linux)
+
+```bash
+source ~/venvs/sce/bin/activate
+cd tb/top && make            # or tb/skid, tb/window, tb/datapath, tb/regs
+cd model && python -m pytest
+```
+
+Requires Icarus Verilog 12+ and Python with `cocotb`, `numpy`, `scipy`, `scikit-image`, `matplotlib`.
+
 ## Plan
 
 | Phase | Work |
 |---|---|
-| 0 | Tool setup; fix backpressure in `grayscale_axis`; first cocotb testbench |
-| 1 | Python golden model, fixed-point analysis, block diagram |
-| 2 | RTL: line buffers, 3×3 window, convolution datapath, skid buffers, AXI4-Lite registers |
+| 0 ✅ | Tool setup; fix backpressure in `grayscale_axis`; first cocotb testbench |
+| 1 ✅ | Python golden model, fixed-point analysis, block diagram |
+| 2 ✅ | RTL: line buffers, 3×3 window, convolution datapath, skid buffers, AXI4-Lite registers |
 | 3 | Verification: bit-exact image tests, randomized backpressure, formal proofs, coverage |
 | 4 | FPGA integration and live HDMI demo on PYNQ-Z2 |
 | 5 | ASIC flow (OpenLane 2, open PDK): GDS, PPA study, FPGA vs ASIC comparison |

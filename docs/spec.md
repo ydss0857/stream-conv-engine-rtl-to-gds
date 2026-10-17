@@ -103,8 +103,11 @@ All configuration is copied into shadow registers at **start of frame** (`tuser`
 | Throughput | 1 pixel/clock (minus flush cycles) |
 | Clock | 150 MHz on xc7z020-1 |
 | Max frame width | `MAX_WIDTH` parameter: 2048 on FPGA, smaller on ASIC (§8) |
-| Latency | One line + 1 pixel (window) + 9 cycles (datapath, 8 register stages) |
-| FPGA resources (per block, routed out of context) | `conv_window`: 1 BRAM36, 102 LUTs, 200 FFs, +1.36 ns slack at 150 MHz. `conv_datapath`: 18 DSP48s, 460 LUTs, 320 FFs, +0.92 ns slack |
+| Latency | One line + 1 pixel (window) + 15 cycles (skids, 2-stage luma, 8-stage datapath) |
+| Measured throughput | 64×64 frame in 4,240 cycles (ideal (W+1)(H+1) = 4,225) |
+| FPGA resources (`conv_engine`, routed out of context, xc7z020-1) | **820 LUTs, 824 FFs, 1 BRAM36, 18 DSP48s; +0.624 ns slack at 150 MHz** |
+
+Per block: `conv_window` 1 BRAM36 / 102 LUTs / +1.36 ns; `conv_datapath` 18 DSP48s / 460 LUTs / +0.92 ns. Integrating the blocks exposed a path through the then-combinational luma stage (−0.50 ns), which was fixed by pipelining it in `luma_axis`.
 
 ## 8. Open questions and PPA study variables (Phase 5)
 
