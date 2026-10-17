@@ -46,6 +46,7 @@ class Config:
     mode: int = MODE_LANE0
     thresh_en: bool = False
     thresh: int = 128
+    enable: bool = True       # False: pass the centre (luma) pixel through unfiltered
 
     def validate(self):
         for k in (self.k0, self.k1):
@@ -104,10 +105,12 @@ def lane(win, kernel, shift):
     return acc
 
 
-def convolve(y, cfg):
-    """u8 luma image -> u8 filtered image, bit-exact with the RTL."""
+def apply_windows(win, cfg):
+    """(..., 9) array of 3x3 windows -> u8 filtered centre pixels (the RTL datapath)."""
     cfg.validate()
-    win = window(np.asarray(y, np.int64))
+    win = np.asarray(win, np.int64)
+    if not cfg.enable:
+        return win[..., 4].astype(np.uint8)
     l0 = lane(win, cfg.k0, cfg.shift0)
     if cfg.mode == MODE_LANE0:
         v = l0
@@ -119,6 +122,11 @@ def convolve(y, cfg):
     if cfg.thresh_en:
         v = np.where(v >= cfg.thresh, 255, 0)
     return v.astype(np.uint8)
+
+
+def convolve(y, cfg):
+    """u8 luma image -> u8 filtered image, bit-exact with the RTL."""
+    return apply_windows(window(np.asarray(y, np.int64)), cfg)
 
 
 def process_frame(tdata, cfg):

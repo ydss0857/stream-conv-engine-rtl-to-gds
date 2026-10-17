@@ -67,6 +67,11 @@ def test_process_frame_replicates_gray():
     assert np.all((out >> 16) == (out & 0xFF)) and np.all(((out >> 8) & 0xFF) == (out & 0xFF))
 
 
+def test_disable_passes_luma_through():
+    y = rng.integers(0, 256, (6, 9))
+    assert np.array_equal(convolve(y, Config(k0=[9] * 9, enable=False)), y)
+
+
 def test_invalid_config_rejected():
     with pytest.raises(AssertionError):
         convolve(np.zeros((3, 3), int), Config(k0=[200] + [0] * 8))
