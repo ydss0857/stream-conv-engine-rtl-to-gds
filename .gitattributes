@@ -1,0 +1,4 @@
+# Keep LF line endings so Makefiles and scripts work inside WSL/Linux
+* text=auto eol=lf
+*.bit binary
+*.dcp binary
