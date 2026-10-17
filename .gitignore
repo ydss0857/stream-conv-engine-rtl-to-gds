@@ -27,3 +27,8 @@ formal/*/*/
 
 # ASIC flow outputs
 asic/runs/
+
+# Coverage outputs
+tb/coverage/
+coverage.dat
+sim_build_cov/

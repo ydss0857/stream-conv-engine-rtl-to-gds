@@ -129,6 +129,18 @@ async def test_status_write_one_to_clear(dut):
 
 
 @cocotb.test()
+async def test_unaligned_addresses(dut):
+    """Address bits [1:0] are ignored: offset+1..3 reach the same 32-bit register."""
+    axi = await setup(dut, seed=6)
+    rng = random.Random(6)
+    for off in REGS:
+        val = rng.getrandbits(32)
+        await axi.write(off | rng.randint(1, 3), val)
+        assert await axi.read(off | rng.randint(1, 3)) == val & REGS[off][1]
+        assert await axi.read(off) == val & REGS[off][1]
+
+
+@cocotb.test()
 async def test_no_delays_back_to_back(dut):
     """Zero-delay master: AW and W in the same cycle, every cycle."""
     axi = await setup(dut, seed=5, max_delay=0)

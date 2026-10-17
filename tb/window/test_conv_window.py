@@ -94,6 +94,15 @@ async def test_max_width(dut):
 
 
 @cocotb.test()
+async def test_extreme_frame_shapes(dut):
+    """Very tall / very wide frames: every bit of the size registers and counters is used."""
+    rng = np.random.default_rng(11)
+    shapes = [(4095, 1), (2, 3), (1, 2048), (3, 640), (513, 2), (2, 1100), (2, 1023), (1, 1)]
+    await run_frames(dut, [rng.integers(0, 256, s) for s in shapes], stall_prob=0.1, seed=12)
+    dut._log.info(f"extreme shapes OK: {shapes}")
+
+
+@cocotb.test()
 async def test_throughput(dut):
     """No stalls: a W x H frame takes about (W+1)(H+1) cycles."""
     src, snk = await setup(dut)
@@ -110,6 +119,51 @@ async def test_throughput(dut):
     snk.check(expected_windows(y))
     assert cycles <= ideal + 8, f"frame took {cycles} cycles, ideal {ideal}"
     dut._log.info(f"{w}x{h} frame in {cycles} cycles (ideal {ideal}, {w * h} pixels)")
+
+
+@cocotb.test()
+async def test_invalid_config_drops_frame(dut):
+    """Start of frame with WIDTH=0, HEIGHT=0 or WIDTH>MAX_WIDTH: err set, frame dropped, recovery."""
+    src, snk = await setup(dut, idle_prob=0.2, stall_prob=0.2, seed=9)
+    rng = np.random.default_rng(9)
+    for bad_w, bad_h in ((0, 3), (4, 0), (2049, 2)):
+        dut.cfg_width.value, dut.cfg_height.value = bad_w, bad_h
+        await src.send(frame_beats(rng.integers(0, 256, (3, 4))))   # tuser + pixels, all swallowed
+        await ClockCycles(dut.clk, 10)
+        assert int(dut.err.value) == 1, f"WIDTH={bad_w} HEIGHT={bad_h} did not set err"
+        assert len(snk.received) == 0, "a frame with an invalid config produced output"
+        dut.err_clr.value = 1
+        await RisingEdge(dut.clk)
+        dut.err_clr.value = 0
+    good = rng.integers(0, 256, (3, 4))
+    await send_frame(dut, src, good)
+    await snk.wait_for(12, 2000)
+    await ClockCycles(dut.clk, 20)
+    snk.check(expected_windows(good))
+    assert int(dut.err.value) == 0
+
+
+@cocotb.test()
+async def test_start_of_frame_mid_frame(dut):
+    """A tuser in the middle of a frame sets err; the frame completes by count; next frame is clean."""
+    src, snk = await setup(dut, idle_prob=0.2, stall_prob=0.3, seed=10)
+    rng = np.random.default_rng(10)
+    bad = frame_beats(rng.integers(0, 256, (3, 5)))
+    bad[7]["user"] = 1
+    dut.cfg_width.value, dut.cfg_height.value = 5, 3
+    await src.send(bad)
+    await snk.wait_for(15, 2000)
+    assert int(dut.err.value) == 1, "mid-frame tuser did not set err"
+    dut.err_clr.value = 1
+    await RisingEdge(dut.clk)
+    dut.err_clr.value = 0
+    good = rng.integers(0, 256, (4, 3))
+    await send_frame(dut, src, good)
+    await snk.wait_for(15 + 12, 2000)
+    await ClockCycles(dut.clk, 20)
+    assert snk.received[15:] == expected_windows(good), "frame after mid-frame tuser is wrong"
+    assert not snk.errors, snk.errors[0]
+    assert int(dut.err.value) == 0
 
 
 @cocotb.test()

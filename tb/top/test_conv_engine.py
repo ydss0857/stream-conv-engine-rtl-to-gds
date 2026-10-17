@@ -95,6 +95,25 @@ async def test_id_and_reset_passthrough(dut):
 
 
 @cocotb.test()
+async def test_register_readback(dut):
+    """Every register reads back what was written, through the top-level AXI4-Lite port."""
+    src, snk, axi = await setup(dut, seed=7)
+    rng = random.Random(7)
+    masks = {REG_CTRL: 0xF, REG_SHIFT: 0xF0F, REG_THRESH: 0xFF, REG_WIDTH: 0xFFF, REG_HEIGHT: 0xFFF,
+             **{REG_K0 + 4 * r: 0xFFFFFF for r in range(3)}, **{REG_K1 + 4 * r: 0xFFFFFF for r in range(3)}}
+    for _ in range(4):
+        for off, mask in masks.items():
+            val = rng.getrandbits(32)
+            await axi.write(off, val)
+            assert await axi.read(off) == val & mask, f"register 0x{off:02X}"
+        for off, mask in masks.items():                      # all-ones then all-zeros
+            await axi.write(off, 0xFFFFFFFF)
+            assert await axi.read(off) == mask
+            await axi.write(off, 0)
+            assert await axi.read(off) == 0
+
+
+@cocotb.test()
 async def test_all_presets_on_images(dut):
     """Every preset on every test image, with random input gaps and output stalls."""
     src, snk, axi = await setup(dut, idle_prob=0.2, stall_prob=0.3, seed=1)
@@ -207,6 +226,26 @@ async def test_throughput(dut):
     ideal = (w + 1) * (h + 1)
     assert cycles <= ideal + 20, f"{w}x{h} frame took {cycles} cycles, ideal {ideal}"
     dut._log.info(f"{w}x{h} frame in {cycles} cycles (ideal {ideal}, latency {cycles - ideal})")
+
+
+@cocotb.test(skip=not os.environ.get("STRESS"))
+async def test_stress_720p(dut):
+    """Two full 1280x720 frames (Sobel, then edges) with random stalls. Run with STRESS=1."""
+    src, snk, axi = await setup(dut, idle_prob=0.05, stall_prob=0.1, seed=6)
+    rgb = data.astronaut()                                   # 512 x 512, tiled to 720p
+    rgb = np.tile(rgb, (2, 3, 1))[:720, :1280]
+    words = pack_rgb(rgb[..., 0], rgb[..., 1], rgb[..., 2])
+    expected = []
+    for cfg in (PRESETS["sobel"], PRESETS["edges"]):
+        await snk.wait_for(len(expected), 10_000_000)
+        await configure(axi, cfg, 1280, 720)
+        expected += expected_beats(words, cfg)
+        await src.send(frame_beats(words))
+    await snk.wait_for(len(expected), 10_000_000)
+    await ClockCycles(dut.aclk, 20)
+    snk.check(expected)
+    assert await axi.read(REG_STATUS) == 0
+    dut._log.info(f"2 x 1280x720 frames, {len(expected)} pixels bit-exact")
 
 
 # ------------------------------------------------------------------ image dump
