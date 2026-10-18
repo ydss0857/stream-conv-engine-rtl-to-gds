@@ -1,0 +1,28 @@
+# LibreLane configuration: conv_engine hardened as a macro on SkyWater sky130.
+#
+#   cd asic/conv_engine
+#   librelane config.yaml                    # sky130A, sky130_fd_sc_hd (defaults)
+#
+# Same RTL as the FPGA build; only the line-buffer depth differs. In standard
+# cells every line-buffer bit is a flip-flop plus read-mux logic, so the first
+# run uses MAX_WIDTH = 128 (2 x 128 x 8 = 2,048 storage flops). The PPA study
+# sweeps this parameter.
+
+DESIGN_NAME: conv_engine
+VERILOG_FILES:
+  - dir::../../rtl/conv_engine.v
+  - dir::../../rtl/conv_regs.v
+  - dir::../../rtl/axis_skid.v
+  - dir::../../rtl/luma_axis.v
+  - dir::../../rtl/conv_window.v
+  - dir::../../rtl/line_ram.v
+  - dir::../../rtl/conv_datapath.v
+  - dir::../../rtl/mul_u8s8.v
+SYNTH_PARAMETERS:
+  - MAX_WIDTH=128
+  - AW=7
+
+CLOCK_PORT: aclk
+CLOCK_PERIOD: 10            # ns -> 100 MHz
+
+FP_CORE_UTIL: 40            # % of core area filled by cells after placement

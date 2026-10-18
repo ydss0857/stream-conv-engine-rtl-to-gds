@@ -1,7 +1,7 @@
 `timescale 1ns / 1ps
 // conv_engine: top level of the streaming 3x3 convolution engine.
 //
-//   s_axis_video -> skid -> luma_axis -> conv_window -> conv_datapath -> {Y,Y,Y} -> skid -> m_axis_video
+//   s_axis_video -> skid -> luma_axis -> skid -> conv_window -> skid -> conv_datapath -> {Y,Y,Y} -> skid -> m_axis_video
 //                                       ^               ^
 //                                       +-- conv_regs --+ <- s_axi_ctrl (AXI4-Lite)
 //
@@ -94,6 +94,18 @@ module conv_engine #(
         .s_data(in_rgb), .s_valid(in_valid), .s_user(in_user), .s_last(in_last), .s_ready(in_ready),
         .m_data(luma), .m_valid(luma_valid), .m_user(luma_user), .m_last(luma_last), .m_ready(luma_ready));
 
+    // Internal skid buffers between blocks keep each block's stall-enable
+    // net local. Without them, one combinational ready chain ran from the
+    // output skid through every block and fanned out to thousands of flops,
+    // which became the critical path in the sky130 ASIC flow.
+    wire [7:0] wl;
+    wire       wl_valid, wl_ready, wl_user, wl_last;
+
+    axis_skid #(.DATA_W(10)) u_luma_skid (
+        .clk(aclk), .rstn(aresetn),
+        .s_data({luma_user, luma_last, luma}), .s_valid(luma_valid), .s_ready(luma_ready),
+        .m_data({wl_user, wl_last, wl}), .m_valid(wl_valid), .m_ready(wl_ready));
+
     // ------------------------------------------------------------ 3x3 window
     wire [71:0] win;
     wire        win_valid, win_ready, win_user, win_last;
@@ -102,8 +114,16 @@ module conv_engine #(
         .clk(aclk), .rstn(aresetn),
         .cfg_width(cfg_width), .cfg_height(cfg_height),
         .err(frame_err), .err_clr(frame_err_clr),
-        .s_data(luma), .s_valid(luma_valid), .s_user(luma_user), .s_last(luma_last), .s_ready(luma_ready),
+        .s_data(wl), .s_valid(wl_valid), .s_user(wl_user), .s_last(wl_last), .s_ready(wl_ready),
         .m_data(win), .m_valid(win_valid), .m_user(win_user), .m_last(win_last), .m_ready(win_ready));
+
+    wire [71:0] dw;
+    wire        dw_valid, dw_ready, dw_user, dw_last;
+
+    axis_skid #(.DATA_W(74)) u_win_skid (
+        .clk(aclk), .rstn(aresetn),
+        .s_data({win_user, win_last, win}), .s_valid(win_valid), .s_ready(win_ready),
+        .m_data({dw_user, dw_last, dw}), .m_valid(dw_valid), .m_ready(dw_ready));
 
     // ------------------------------------------------------------ MAC datapath
     wire [7:0] pix;
@@ -114,7 +134,7 @@ module conv_engine #(
         .cfg_enable(cfg_enable), .cfg_k0(cfg_k0), .cfg_k1(cfg_k1),
         .cfg_shift0(cfg_shift0), .cfg_shift1(cfg_shift1), .cfg_mode(cfg_mode),
         .cfg_thresh_en(cfg_thresh_en), .cfg_thresh(cfg_thresh),
-        .s_data(win), .s_valid(win_valid), .s_user(win_user), .s_last(win_last), .s_ready(win_ready),
+        .s_data(dw), .s_valid(dw_valid), .s_user(dw_user), .s_last(dw_last), .s_ready(dw_ready),
         .m_data(pix), .m_valid(pix_valid), .m_user(pix_user), .m_last(pix_last), .m_ready(pix_ready));
 
     // ------------------------------------------------------------ output skid

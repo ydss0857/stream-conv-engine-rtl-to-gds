@@ -26,7 +26,7 @@ __pycache__/
 formal/*/*/
 
 # ASIC flow outputs
-asic/runs/
+asic/**/runs/
 
 # Coverage outputs
 tb/coverage/
