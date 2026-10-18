@@ -158,6 +158,6 @@ async def test_throughput(dut):
         await RisingEdge(dut.clk)
         cycles += 1
     snk.check(beats_out)
-    # 8 pipeline registers + the source's first cycle = 9 cycles of latency.
-    assert cycles <= len(beats_in) + 9, f"{len(beats_in)} windows took {cycles} cycles"
+    # 8 pipeline registers + output FIFO + the source's first cycle = 10 cycles of latency.
+    assert cycles <= len(beats_in) + 10, f"{len(beats_in)} windows took {cycles} cycles"
     dut._log.info(f"{len(beats_in)} windows in {cycles} cycles (latency {cycles - len(beats_in)})")

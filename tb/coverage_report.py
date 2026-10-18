@@ -27,6 +27,9 @@ WAIVERS = [
     ("conv_datapath.v", r"^rnd[01]\[(1[5-9])\]",       "rounding constant is at most 2^14 (shift <= 15)"),
     ("conv_datapath.v", r"^abs[01]\[19\]",             "|lane| <= 310,144 < 2^19, so bit 19 is always 0"),
     ("luma_axis.v",     r"^g1\[0\]",                   "150*G is always even, so bit 0 is always 0"),
+    ("conv_window.v",   r"^\((s_user|s_valid)==0 && .* && r_zero==1 && c_zero==1\) => 0$",
+                                                       "at position (0,0) the start-of-frame beat is still held "
+                                                       "(AXI4-Stream), so s_valid=1 and s_user=1"),
     ("luma_axis.v",     r"^rb1\[15\]",                 "77*R + 29*B <= 26,010 < 2^15, so bit 15 is always 0"),
 ]
 
