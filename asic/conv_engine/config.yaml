@@ -23,7 +23,10 @@ SYNTH_PARAMETERS:
   - AW=7
 
 CLOCK_PORT: aclk
-CLOCK_PERIOD: 10            # ns -> 100 MHz
+# Sign-off target from the requirement, not an arbitrary number: 720p60 needs a
+# 74.25 MHz pixel clock (~74.4 MHz with the engine's flush cycles), so close
+# 80 MHz at every corner including ss/100C/1.60V. Runs v1-v3 used 10 ns.
+CLOCK_PERIOD: 12.5          # ns -> 80 MHz
 
 FP_CORE_UTIL: 40            # % of core area filled by cells after placement
 
@@ -33,3 +36,11 @@ FP_CORE_UTIL: 40            # % of core area filled by cells after placement
 # repair still has dlygate4sd* / dlymetal6s* delay cells.
 EXTRA_EXCLUDED_CELLS:
   - sky130_fd_sc_hd__clkdlybuf4s*
+
+# Run v3: repair sized buffers at the typical corner with a 10-20 % margin, so
+# at ss (about 2x slower) thousands of pins exceeded max slew (2.07 ns vs
+# 0.75 ns). Repair with more margin and buffer long wires.
+DESIGN_REPAIR_MAX_SLEW_PCT: 50
+DESIGN_REPAIR_MAX_CAP_PCT: 40
+GRT_DESIGN_REPAIR_MAX_SLEW_PCT: 40
+DESIGN_REPAIR_MAX_WIRE_LENGTH: 400
