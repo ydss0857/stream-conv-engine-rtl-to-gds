@@ -12,12 +12,17 @@
 #
 # Runs live on the Linux filesystem because a flow writes thousands of files;
 # on /mnt/c the first run took 80 minutes.
+#
+# Each run is capped at MAX_RUNTIME (default 2h). On timeout the whole process
+# group (LibreLane, OpenROAD, ...) is stopped, partial results are still copied
+# back, and the script exits with status 124.
 set -euo pipefail
 
 TAG=${1:?usage: run_flow.sh <tag> [-c KEY=VALUE ...]}
 shift
 REPO=$(cd "$(dirname "$0")/.." && pwd)
 LIBRELANE=${LIBRELANE:-$HOME/src/librelane-3.0.16}
+MAX_RUNTIME=${MAX_RUNTIME:-2h}
 WORK=$HOME/asic_work/$TAG
 OUT=$REPO/asic/results/$TAG
 
@@ -30,9 +35,14 @@ for a in "$@"; do ARGS+=" $(printf '%q' "$a")"; done
 
 cd "$LIBRELANE"
 set +e
-nix-shell --run "cd $WORK/asic/conv_engine && librelane --run-tag $TAG --overwrite$ARGS config.yaml" \
+timeout --kill-after=2m "$MAX_RUNTIME" \
+    nix-shell --run "cd $WORK/asic/conv_engine && librelane --run-tag $TAG --overwrite$ARGS config.yaml" \
     > "$WORK/flow.log" 2>&1
 STATUS=$?
+if [ $STATUS -eq 124 ] || [ $STATUS -eq 137 ]; then
+    echo "TIMEOUT: run exceeded $MAX_RUNTIME and was stopped" | tee -a "$WORK/flow.log"
+    STATUS=124
+fi
 set -e
 
 RUN=$WORK/asic/conv_engine/runs/$TAG
