@@ -24,7 +24,8 @@ data_bmc: mode bmc
 data_bmc: depth 24
 data_cover: mode cover
 data_cover: depth 24
-aigsmt z3
+proto_prove: aigsmt z3
+data_bmc: aigsmt z3
 
 [engines]
 proto_prove: abc pdr

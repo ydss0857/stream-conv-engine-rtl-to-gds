@@ -28,7 +28,7 @@ OUT=$REPO/asic/results/$TAG
 
 mkdir -p "$WORK/rtl" "$WORK/asic/conv_engine"
 cp "$REPO"/rtl/*.v "$WORK/rtl/"
-cp "$REPO/asic/conv_engine/config.yaml" "$WORK/asic/conv_engine/"
+cp "$REPO"/asic/conv_engine/{config.yaml,*.sdc} "$WORK/asic/conv_engine/"
 
 ARGS=""
 for a in "$@"; do ARGS+=" $(printf '%q' "$a")"; done

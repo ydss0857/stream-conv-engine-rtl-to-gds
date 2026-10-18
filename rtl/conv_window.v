@@ -56,17 +56,29 @@ module conv_window #(
     input  wire        m_ready
 );
     // ------------------------------------------------------------ stage A
+    // Position tracking uses down-counters (columns/rows remaining) and
+    // registered one-bit flags computed one step ahead, instead of comparing
+    // 12-bit counters with WIDTH/HEIGHT every cycle. In the sky130 ASIC flow
+    // those comparators fed a_fire and made a ~20-level critical path; here
+    // a_fire depends only on flops through a couple of gates.
+    //   column ic (0..width):  c_zero ic==0   c_one ic==1
+    //                          c_last ic==width-1   c_flush ic==width
+    //   row ir (0..height):    r_zero ir==0   r_one ir==1
+    //                          r_last ir==height-1  r_flush ir==height
     reg        running;
     reg [11:0] width, height;     // latched at start of frame
-    reg [11:0] ir, ic;            // position: 0..height, 0..width
+    reg [11:0] ic;                // column, used as the line-buffer address
+    reg [11:0] cl, rl;            // columns / rows remaining: width-ic, height-ir
+    reg        c_zero, c_one, c_last, c_flush, w_is1;
+    reg        r_zero, r_one, r_last, r_flush;
 
     wire cfg_ok   = (cfg_width != 0) && (cfg_height != 0) && (cfg_width <= MAX_WIDTH);
     wire adv      = !m_valid || m_ready;            // whole pipeline moves
-    wire need_pix = (ir < height) && (ic < width);  // not a flush position
+    wire need_pix = !r_flush && !c_flush;           // not a flush position
     wire a_fire   = running && adv && (!need_pix || s_valid);
     wire pix_fire = a_fire && need_pix;
-    wire at_end   = (ir == height) && (ic == width);
-    wire lb_rd    = a_fire && (ic < width);
+    wire at_end   = r_flush && c_flush;
+    wire lb_rd    = a_fire && !c_flush;
 
     // Idle: swallow pixels until a start of frame arrives.
     assign s_ready = running ? (adv && need_pix) : (!s_user || !cfg_ok);
@@ -79,17 +91,41 @@ module conv_window #(
                 running <= 1'b1;
                 width   <= cfg_width;
                 height  <= cfg_height;
-                ir      <= 12'd0;
+                w_is1   <= (cfg_width == 12'd1);
                 ic      <= 12'd0;
+                cl      <= cfg_width;
+                c_zero  <= 1'b1;
+                c_one   <= 1'b0;
+                c_last  <= (cfg_width == 12'd1);
+                c_flush <= 1'b0;
+                rl      <= cfg_height;
+                r_zero  <= 1'b1;
+                r_one   <= 1'b0;
+                r_last  <= (cfg_height == 12'd1);
+                r_flush <= 1'b0;
             end
         end else if (a_fire) begin
             if (at_end) begin
                 running <= 1'b0;
-            end else if (ic == width) begin
-                ic <= 12'd0;
-                ir <= ir + 12'd1;
-            end else begin
-                ic <= ic + 12'd1;
+            end else if (c_flush) begin           // wrap to the next row
+                ic      <= 12'd0;
+                cl      <= width;
+                c_zero  <= 1'b1;
+                c_one   <= 1'b0;
+                c_last  <= w_is1;
+                c_flush <= 1'b0;
+                rl      <= rl - 12'd1;
+                r_zero  <= 1'b0;
+                r_one   <= r_zero;
+                r_last  <= (rl == 12'd2);
+                r_flush <= r_last;
+            end else begin                        // next column
+                ic      <= ic + 12'd1;
+                cl      <= cl - 12'd1;
+                c_zero  <= 1'b0;
+                c_one   <= c_zero;
+                c_last  <= (cl == 12'd2);
+                c_flush <= c_last;
             end
         end
     end
@@ -98,8 +134,8 @@ module conv_window #(
         if (!rstn)
             err <= 1'b0;
         else if ((!running && s_valid && s_user && !cfg_ok) ||
-                 (pix_fire && (s_last != (ic == width - 12'd1))) ||
-                 (pix_fire && s_user && (ir != 0 || ic != 0)))
+                 (pix_fire && (s_last != c_last)) ||
+                 (pix_fire && s_user && !(r_zero && c_zero)))
             err <= 1'b1;
         else if (err_clr)
             err <= 1'b0;
@@ -134,14 +170,14 @@ module conv_window #(
         if (a_fire) begin
             b_pix   <= s_data;
             b_ic    <= ic[AW-1:0];
-            b_lb    <= (ic < width);                // touches the line buffers
-            b_top   <= (ir == 12'd1);               // row above is off-frame
-            b_bot   <= (ir == height);              // row below is off-frame
-            b_left  <= (ic == 12'd1);               // column left is off-frame
-            b_right <= (ic == width);               // column right is off-frame
-            b_emit  <= (ir != 0) && (ic != 0);
-            b_user  <= (ir == 12'd1) && (ic == 12'd1);
-            b_last  <= (ic == width);
+            b_lb    <= !c_flush;                    // touches the line buffers
+            b_top   <= r_one;                       // row above is off-frame
+            b_bot   <= r_flush;                     // row below is off-frame
+            b_left  <= c_one;                       // column left is off-frame
+            b_right <= c_flush;                     // column right is off-frame
+            b_emit  <= !r_zero && !c_zero;
+            b_user  <= r_one && c_one;
+            b_last  <= c_flush;
         end
     end
 

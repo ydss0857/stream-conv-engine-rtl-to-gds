@@ -28,6 +28,11 @@ CLOCK_PORT: aclk
 # 80 MHz at every corner including ss/100C/1.60V. Runs v1-v3 used 10 ns.
 CLOCK_PERIOD: 12.5          # ns -> 80 MHz
 
+# Same as LibreLane's default SDC except for a realistic minimum input delay
+# (see the file header). Used for both PnR and sign-off STA.
+PNR_SDC_FILE: dir::conv_engine.sdc
+SIGNOFF_SDC_FILE: dir::conv_engine.sdc
+
 FP_CORE_UTIL: 40            # % of core area filled by cells after placement
 
 # Runs v1/v2: the resizer used clkdlybuf4s25_1 (a slow delay cell, ~1.3-1.5 ns
