@@ -1,0 +1,69 @@
+/* Print stylesheet for the technical reports (rendered to PDF with Edge headless). */
+@page { size: Letter; margin: 0.75in 0.8in 0.8in 0.8in; }
+
+:root {
+  --ink: #111;
+  --ink-2: #4a4a47;
+  --rule: #c9c8c3;
+  --accent: #2a78d6;
+  --shade: #f3f2ee;
+}
+
+html { background: #fff; }
+body {
+  font-family: "Charter", "Georgia", "Cambria", serif;
+  font-size: 10.5pt;
+  line-height: 1.42;
+  color: var(--ink);
+  margin: 0;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+h1 { font-size: 17pt; line-height: 1.2; margin: 0 0 6pt; font-weight: 700; }
+.subtitle { font-size: 11pt; color: var(--ink-2); margin: 0 0 8pt; }
+.byline { font-size: 9.5pt; color: var(--ink-2); margin-bottom: 12pt; text-align: left; }
+.byline a { color: var(--ink-2); }
+
+h2 {
+  font-size: 12pt; margin: 14pt 0 4pt; padding-top: 3pt;
+  border-top: 0.6pt solid var(--rule); break-after: avoid;
+}
+h3 { font-size: 10.5pt; margin: 9pt 0 2pt; break-after: avoid; }
+p { margin: 0 0 6pt; text-align: justify; hyphens: auto; }
+ul, ol { margin: 0 0 6pt; padding-left: 16pt; }
+li { margin-bottom: 2pt; }
+a { color: var(--accent); text-decoration: none; }
+code { font-family: "Consolas", "DejaVu Sans Mono", monospace; font-size: 9pt; }
+
+.abstract {
+  background: var(--shade); padding: 8pt 11pt; margin: 0 0 8pt;
+  font-size: 10pt; border-left: 2.5pt solid var(--accent);
+}
+.abstract p { margin: 0; }
+.ask {
+  background: #e8f0fb; padding: 8pt 11pt; margin: 6pt 0 8pt;
+  border-left: 2.5pt solid var(--accent);
+}
+
+table {
+  border-collapse: collapse; width: 100%; margin: 4pt 0 8pt;
+  font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif; font-size: 8.6pt;
+  break-inside: avoid;
+}
+th, td { padding: 2.6pt 5pt; border-bottom: 0.5pt solid var(--rule); vertical-align: top; }
+th { text-align: left; border-bottom: 1pt solid var(--ink-2); font-weight: 600; }
+td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
+caption { caption-side: bottom; text-align: left; color: var(--ink-2); font-size: 8.5pt; padding-top: 3pt; }
+
+figure { margin: 6pt 0 10pt; break-inside: avoid; }
+figure img { width: 100%; display: block; }
+figure.narrow img { width: 72%; margin: 0 auto; }
+figcaption { font-size: 8.8pt; color: var(--ink-2); margin-top: 3pt; }
+figcaption b { color: var(--ink); }
+
+.two { display: flex; gap: 12pt; align-items: flex-start; }
+.two > * { flex: 1; }
+
+.small { font-size: 9pt; color: var(--ink-2); }
+.page-break { break-before: page; }

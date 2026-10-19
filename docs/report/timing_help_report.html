@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Slow-Corner Timing Closure of a Streaming Convolution Engine on sky130</title>
+<link rel="stylesheet" href="report.css">
+</head>
+<body>
+
+<h1>Slow-Corner Timing Closure of a Streaming Convolution Engine on sky130: Results and Open Questions</h1>
+<p class="byline">[Your Name] · B.S. Electrical Engineering, Case Western Reserve University · October 2026 ·
+<a href="https://github.com/ydss0857/stream-conv-engine-rtl-to-gds">github.com/ydss0857/stream-conv-engine-rtl-to-gds</a></p>
+
+<div class="ask"><p><b>What I am asking.</b> I implemented a verified 3×3 image-convolution engine on the open-source SkyWater sky130 process. It passes the flow's default sign-off (0 DRC, 0 LVS, hold clean at all corners, setup met at the typical corner), but after seven implementation runs it still misses my 80 MHz target at the slow corner (ss, 100 °C, 1.60 V) by 2.27 ns. I have a diagnosis and a plan (§4–5), but this is my first ASIC flow, and I would value an expert's view on whether my reasoning and next steps are sound. The four questions in §6 are where advice would help most.</p></div>
+
+<h2>1. The design</h2>
+<figure><img src="fig_architecture.png" alt="Block diagram">
+<figcaption><b>Figure 1.</b> <code>conv_engine</code>: AXI4-Stream video in and out, AXI4-Lite control. Two line buffers form 3×3 windows; two programmable 9-multiplier lanes compute blur, sharpen, Laplacian or Sobel magnitude at one pixel per clock.</figcaption></figure>
+<p>The RTL is verified against a bit-exact Python model: 32 cocotb tests on two simulators, 1.89 M output pixels compared, formal proofs of the interface protocols (SymbiYosys), and 100% line/branch/expression/toggle coverage. The same RTL meets 150 MHz on a Zynq-7020 FPGA. The 80 MHz ASIC target comes from the application: 720p60 video needs 74.25 MHz.</p>
+
+<h2>2. Implementation setup</h2>
+<table>
+<tr><th>Item</th><th>Setting</th></tr>
+<tr><td>Flow / PDK / library</td><td>LibreLane 3.0.16 (Yosys, OpenROAD, Magic, KLayout, Netgen) · sky130A · <code>sky130_fd_sc_hd</code></td></tr>
+<tr><td>Scope</td><td>Macro only (no pad ring); line-buffer width 128 pixels (2 × 128 × 8 bits of flip-flops)</td></tr>
+<tr><td>Clock / I/O constraints</td><td>12.5 ns; input and output delay 20% of the period; minimum input delay raised by 1 ns to model the external driver's clock latency (otherwise every input-to-flop path fails hold at the macro boundary)</td></tr>
+<tr><td>Non-default flow settings</td><td><code>FP_CORE_UTIL</code> 50; <code>PNR_CORNERS</code> = nom_ss_100C_1v60; <code>EXTRA_EXCLUDED_CELLS</code> = clkdlybuf4s* (the resizer was using these delay cells as ordinary buffers)</td></tr>
+<tr><td>Reset</td><td>Single active-low synchronous reset <code>aresetn</code> from an input port</td></tr>
+</table>
+
+<h2>3. Results and what has been tried</h2>
+<table>
+<tr><th>Metric (baseline run v7)</th><th class="n">Result</th><th>Metric</th><th class="n">Result</th></tr>
+<tr><td>Die / std-cell area</td><td class="n">0.468 / 0.283 mm²</td><td>DRC / LVS / antenna</td><td class="n">0 / 0 / 0</td></tr>
+<tr><td>Setup @ 12.5 ns, tt / ff</td><td class="n">+3.57 / +5.95 ns</td><td>Hold, all corners</td><td class="n">met</td></tr>
+<tr><td>Setup @ 12.5 ns, ss</td><td class="n">−2.27 ns, TNS −19 ns</td><td>Max-slew violations at ss</td><td class="n">≈ 9,200 (worst 2.07 ns vs 0.75 ns limit)</td></tr>
+</table>
+<figure><img src="fig_timing_closure.png" alt="Timing closure">
+<figcaption><b>Figure 2.</b> Slow-corner worst slack and total setup violation across seven runs. Runs v1–v3 targeted 100 MHz; v4b onward target 80 MHz.</figcaption></figure>
+<table>
+<tr><th>Run</th><th>Change</th><th>What the next worst path revealed</th></tr>
+<tr><td>v1</td><td>First run</td><td>A pipeline stall-enable chain ran combinationally through every block</td></tr>
+<tr><td>v2</td><td>Skid buffers between blocks (RTL)</td><td>The resizer used <code>clkdlybuf4s25</code> delay cells (≈ 1.4 ns each) as fanout buffers</td></tr>
+<tr><td>v3</td><td>Excluded those cells</td><td>Long chains of <code>buf_1</code> sized for the typical corner</td></tr>
+<tr><td>v4</td><td>Repair margins slew 50% / cap 40%</td><td>Repair flagged ~18,000 nets and did not converge in 2 h (abandoned)</td></tr>
+<tr><td>v4b</td><td>80 MHz target</td><td>A ~20-level 12-bit comparator chain in the window generator; hold failing only on input ports</td></tr>
+<tr><td>v5</td><td>Precomputed counter flags (RTL); realistic min input delay (SDC)</td><td>Hold closed; next, a shared clock enable driving ~650 datapath flops</td></tr>
+<tr><td>v6</td><td>Free-running datapath with credit-based output FIFO (RTL)</td><td>Long buffered nets; ~9,000 slew violations at ss</td></tr>
+<tr><td>v7</td><td>Placement and repair at the ss corner; utilisation 40% → 50%</td><td>See §4</td></tr>
+</table>
+
+<h2>4. Current diagnosis</h2>
+<p>In run v7, 20 paths violate at ss. <b>14 of them start at the reset input <code>aresetn</code></b>, which reaches the reset flops through a ~10-stage buffer tree (worst −2.27 ns). The worst path that does <i>not</i> start at reset misses by only <b>−0.61 ns</b>. Across a line-buffer width sweep, the non-reset slack degrades steadily as the flip-flop line-buffer array grows:</p>
+<table>
+<tr><th>Line-buffer width</th><th class="n">64</th><th class="n">128</th><th class="n">256</th><th class="n">512</th><th class="n">128, <code>hs</code> library</th></tr>
+<tr><td>Violating paths at ss</td><td class="n">11</td><td class="n">20</td><td class="n">58</td><td class="n">> 1,000</td><td class="n">9</td></tr>
+<tr><td>of which from <code>aresetn</code></td><td class="n">7</td><td class="n">14</td><td class="n">0</td><td class="n">0</td><td class="n">0</td></tr>
+<tr><td>Worst non-reset slack (ns)</td><td class="n">−0.69</td><td class="n">−0.61</td><td class="n">−2.83</td><td class="n">−4.62</td><td class="n">−0.75</td></tr>
+<tr><td>Std-cell area (mm²)</td><td class="n">0.224</td><td class="n">0.283</td><td class="n">0.402</td><td class="n">0.635</td><td class="n">0.378</td></tr>
+</table>
+<div class="two">
+<figure><img src="../img/asic_placement_w128.png" alt="Placement map">
+<figcaption><b>Figure 3.</b> Run v7, every flip-flop coloured by RTL block. The 2,048 line-buffer flops (red) occupy a ~600 × 280 µm region below the window generator (orange).</figcaption></figure>
+<div>
+<p>My reading is that two separate problems overlap:</p>
+<ol>
+<li><b>Reset distribution.</b> A single synchronous reset from an input port must reach every reset flop (register-block reset values, valid bits, counters, FIFO pointers) within one cycle, after a 2.5 ns input delay. At ss the buffer tree cannot do this.</li>
+<li><b>The flip-flop line-buffer array.</b> The window generator's read address and enables fan out across the whole array every cycle. I suspect, but have not yet confirmed net by net, that these nets account for most of the ~9,000 slew violations at ss (the worst violators are inserted fanout buffers with ~2.07 ns input transitions). This path dominates as the array grows. Placing and repairing at the ss corner (v7) improved total slack but left the slew-violation count essentially unchanged.</li>
+</ol>
+<p>The faster <code>hs</code> library closes the logic paths to −0.75 ns (75 MHz, enough for 720p60), at +33% area and 2.2× power.</p>
+</div></div>
+
+<h2>5. What I plan to try next</h2>
+<ol>
+<li><b>Registered, replicated reset:</b> register <code>aresetn</code> at the boundary and give each block its own local reset flop. Also remove resets from flops that don't need one.</li>
+<li><b>Line-buffer read path:</b> bank the line buffers and register the bank select and decoded address one cycle early, so no read-address net spans the array.</li>
+<li><b>SRAM line buffers</b> using sky130's OpenRAM <code>1rw1r</code> macros. By macro dimensions, two 1 KB macros match the flip-flop cell area at about 440 pixels of width. The PDK only provides a typical-corner model for them, though.</li>
+<li><b>Repair settings in small steps</b> (slew margin 20 → 30%, wire-length buffering), after v4 showed that large jumps do not converge.</li>
+</ol>
+
+<h2>6. Questions</h2>
+<ol>
+<li><b>Reset:</b> for a hardened macro like this, what reset style would you recommend: a registered and replicated synchronous reset, asynchronous assert with synchronous deassert, or treating reset as a multicycle or false path?</li>
+<li><b>Flip-flop memories:</b> for a ~2,000-bit flip-flop array read every cycle, is banking with a pipelined read the usual fix, or would you go straight to SRAM (given the typical-only macro model in sky130)?</li>
+<li><b>Slew violations:</b> why might sizing buffers for the ss corner leave ~9,000 max-slew violations essentially unchanged? Is this a sign that something in my setup (constraints or floorplan) is wrong?</li>
+<li><b>Sign-off target:</b> LibreLane's default sky130 sign-off checks setup only at the typical corner. For an academic project, is it reasonable to sign off at tt and report the ss Fmax, or should I keep pushing for all-corner closure?</li>
+</ol>
+<p>Thank you for reading. The full configuration, constraints, timing reports for every run, and the RTL are in the repository; I am happy to send any of them directly.</p>
+</body>
+</html>

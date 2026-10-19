@@ -25,7 +25,7 @@ Builds on [Pynq-Z2_VideoP](https://github.com/ydss0857/Pynq-Z2_VideoP), the HDMI
 | FPGA (xc7z020-1, out of context) | 898 LUTs, 1,012 FFs, 1 BRAM36, 18 DSP48s, meets 150 MHz (+0.81 ns) |
 | ASIC (sky130A hd, `MAX_WIDTH` 128) | 0.468 mm², 0 DRC / 0 LVS, hold clean at all corners, 80 MHz at typical (Fmax ≈ 112 MHz), ≈ 68 MHz at the slow corner; 28 mW |
 | Simulation | 32 cocotb tests on Icarus and Verilator; 1.89 M output pixels bit-exact with the Python model, including two 1280×720 frames |
-| Formal | Unbounded proofs of every interface protocol (skid buffer, AXI4-Lite registers, window generator); bounded proof of window contents |
+| Formal | Unbounded protocol proofs for the skid buffer, AXI4-Lite registers and window generator; bounded proof of window contents |
 | Coverage | 100 % line, branch, expression and toggle (82 documented waivers) |
 | Mutation testing | 14 injected bugs, all caught |
 

@@ -32,3 +32,6 @@ asic/**/runs/
 tb/coverage/
 coverage.dat
 sim_build_cov/
+
+# Personal correspondence (email drafts) - never commit
+outreach/

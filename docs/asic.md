@@ -59,7 +59,11 @@ Full metrics: `python3 asic/compare.py` (results in [`asic/results/`](../asic/re
 
   The last two also *improved* the FPGA build (+0.62 → +0.81 ns slack at 150 MHz) and made the window generator's unbounded formal proof ~20× faster (3 min 55 s → 11 s).
 
-**What did not close:** setup at the slow corner. The placement map shows why: the line-buffer array spans ~600 × 280 µm, and the window generator's read address and enables must reach all of it every cycle. At ss (100 °C, 1.60 V) those long nets have 2+ ns transitions, which no amount of buffer repair recovered (v3–v7). LibreLane's own sky130 sign-off checks setup at the typical corner only (`TIMING_VIOLATION_CORNERS = *tt*`), which this design passes with 3.6 ns to spare; the all-corner target was this project's stricter choice.
+**What did not close:** setup at the slow corner, for two different reasons depending on width:
+- **At width 128 (v7), it's mostly reset distribution.** 14 of the 20 violating paths start at the synchronous reset input `aresetn`, which reaches every reset flop through a ~10-stage buffer tree. The worst *logic* path misses by only 0.61 ns.
+- **For wider line buffers, it's the line-buffer read path.** The flip-flop array spans ~600 × 280 µm at width 128 (placement map), and the window generator's read address and enables must reach all of it every cycle. At ss (100 °C, 1.60 V) those long nets have 2+ ns transitions; the worst non-reset slack degrades from −0.6 ns (width 64) to −4.6 ns (width 512).
+
+The next experiment is a registered, locally replicated reset, which needs a small RTL change ([phase5_open_items.md](phase5_open_items.md)). LibreLane's own sky130 sign-off checks setup at the typical corner only (`TIMING_VIOLATION_CORNERS = *tt*`), which this design passes with 3.6 ns to spare; the all-corner target was this project's stricter choice.
 
 **Lessons:**
 - **FPGA-friendly is not ASIC-friendly.** A shared clock enable costs nothing on an FPGA (every flop has a CE pin and enables have dedicated routing), but in standard cells it is a high-fanout net plus a mux per flop.

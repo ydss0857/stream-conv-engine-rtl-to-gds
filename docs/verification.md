@@ -9,7 +9,7 @@ How the streaming convolution engine (`rtl/conv_engine.v`) was verified, what ea
 | Golden model | Bit-exact Python reference (`model/conv_model.py`) | 14 unit tests pass |
 | Simulation (cocotb) | 32 tests across 5 testbenches, every block plus the top level | All pass on **Icarus Verilog 12** and **Verilator 5.040** |
 | End-to-end | Real images, all 7 filter presets, random stalls, 720p frames | **1.89 M output pixels bit-exact** with the model |
-| Formal (SymbiYosys) | Skid buffer, register block, window generator | **Unbounded proofs** on every interface protocol; **bounded proof** of window contents |
+| Formal (SymbiYosys) | Skid buffer, register block, window generator | **Unbounded proofs** of their protocols; **bounded proof** of window contents |
 | Mutation testing | 14 deliberately injected bugs (18 runs across simulation and formal) | **All 14 caught** (1 only after a testbench fix, see §5) |
 | Coverage (Verilator) | All 8 RTL modules | **100 % line, branch, expression and toggle**, with 82 documented waivers |
 

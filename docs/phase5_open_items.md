@@ -28,14 +28,23 @@ At the slow corner about 9,000 pins also exceed the 0.75 ns max-transition limit
 | v6 | Free-running datapath with credit FIFO (RTL) | Removed a 650-flop enable net |
 | v7 | `PNR_CORNERS` = ss, utilisation 40 → 50 % | TNS −19 ns, slew violations unchanged |
 
-**Current diagnosis.**
-- The flip-flop line buffers form a ~600 × 280 µm array (see the [placement map](img/asic_placement_w128.png)).
-- The window generator's read address and enables must reach all of it every cycle, through long, heavily buffered nets.
-- At ss these nets have 2+ ns transitions, and neither design changes nor repair settings have removed them.
-- The width sweep is consistent with this: wider buffers give worse ss timing (74 → 68 → 65 → 58 MHz from width 64 to 512), while the typical corner stays flat.
-- The high-speed library improves it (ss Fmax 75 MHz) at +33 % area and 2.2× power.
+**Current diagnosis** (updated 2026-10-19 after reading the full v7 ss timing report):
+
+| Run | Violating paths (ss) | Starting at `aresetn` | Worst non-reset slack |
+|---|---:|---:|---:|
+| v7 (w128, ss-corner PnR) | 20 | 14 | **−0.61 ns** |
+| w64 | 11 | 7 | −0.69 ns |
+| v6 (w128) | 48 | 0 | −2.32 ns |
+| w256 | 58 | 0 | −2.83 ns |
+| w512 | > 1,000 | 0 | −4.62 ns |
+| hs_w128 | 9 | 0 | −0.75 ns |
+
+1. **At width 128, the remaining headline violation (−2.27 ns) is reset distribution.** The synchronous reset `aresetn` enters at an input port (input delay 2.5 ns) and reaches every reset flop (register-block reset values, valid bits, counters, pointers) through a ~10-stage buffer tree. The logic paths miss by only 0.61 ns.
+2. **For wider line buffers, logic paths dominate.** The flip-flop array grows (~600 × 280 µm at width 128, see the [placement map](img/asic_placement_w128.png)), and the window generator's read address and enables must reach all of it every cycle through long, heavily buffered nets with 2+ ns transitions at ss. Non-reset slack degrades from −0.6 (w64) to −4.6 ns (w512).
+3. The high-speed library improves the logic paths (ss Fmax 75 MHz) at +33 % area and 2.2× power.
 
 **Ideas not yet tried:**
+0. **Registered, replicated reset** (most direct fix for width 128). Register `aresetn` at the boundary, then give each block its own local reset flop, so no reset net spans the die in one cycle. Alternatively, remove synchronous reset from flops that don't need it. Small RTL change plus one run.
 1. **SRAM macros for the line buffers** (Extra B below). This removes the flip-flop array and its long nets entirely.
 2. **Restructure the read path in RTL.** Bank the line buffers (for example 4 banks of 32 columns) and pipeline the read: register the bank select and decoded address one cycle early, so no single net spans the whole array. Costs a cycle of latency in the window generator.
 3. **Floorplanning.** Constrain the line-buffer flops to a region next to the window generator, or harden the line buffers as their own macro and place it explicitly.
@@ -43,10 +52,10 @@ At the slow corner about 9,000 pins also exceed the 0.75 ns max-transition limit
 5. **Mixed libraries:** `hs` cells only on the critical nets (if the flow allows mixing `hd` and `hs`).
 
 **Questions to ask an expert:**
-- Is ~68 MHz at ss for this structure reasonable for sky130 `hd` at 130 nm, or does it point to a flow problem?
+- For a hardened macro, what is good practice for the reset: a registered and replicated synchronous reset tree, asynchronous assert with synchronous deassert, or treating reset as a timing exception?
 - For a flip-flop array of this size, what is the usual fix: banking and pipelining in RTL, floorplan guidance, or simply SRAM?
+- Why might slow-corner placement and repair (`PNR_CORNERS` = ss) leave ~9,000 max-slew violations essentially unchanged while timing improves?
 - Is signing off setup at tt (LibreLane's sky130 default) acceptable for an academic project, provided the ss Fmax is reported?
-- Why might slow-corner placement and repair (`PNR_CORNERS` = ss) leave the slew violations essentially unchanged?
 
 ## 2. Extra A: fixed kernel versus programmable kernel
 
