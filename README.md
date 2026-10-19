@@ -76,6 +76,28 @@ Requires Icarus Verilog 12+ and Python with `cocotb`, `numpy`, `scipy`, `scikit-
 | 5 ✅ | ASIC flow (LibreLane, sky130): GDS, timing closure, PPA study, FPGA vs ASIC comparison |
 | 6 | Write-up and technical report |
 
+## Reports
+
+- [docs/report/rtl_to_gds_report.pdf](docs/report/rtl_to_gds_report.pdf): technical report covering the full RTL-to-GDS project (5 pages).
+- [docs/report/timing_help_report.pdf](docs/report/timing_help_report.pdf): the open slow-corner timing problem, with data and questions (4 pages).
+- [docs/phase5_open_items.md](docs/phase5_open_items.md): open problems and planned experiments.
+
+## Licence and credits
+
+The code and documentation in this repository are released under the [MIT License](LICENSE). Exception: [`asic/conv_engine/conv_engine.sdc`](asic/conv_engine/conv_engine.sdc) is derived from LibreLane's default SDC and keeps its Apache-2.0 terms.
+
+Third-party work used here, under its own licence:
+- **SkyWater sky130 PDK** (Apache-2.0).
+- **LibreLane** and the open-source tools it drives (OpenROAD, Yosys, Magic, KLayout, Netgen).
+- **Verification tools:** cocotb, SymbiYosys, Verilator, Icarus Verilog.
+- **AMD Vivado.**
+- **Digilent `vivado-library`** (MIT; not included in this repository).
+- **Test images from scikit-image:** *astronaut* (NASA, public domain), *camera* (CC0, Lav Varshney), *coffee* (CC0, Rachel Michetti).
+
+Full references are in the reports.
+
+**AI assistance.** Development of the RTL, verification environment, flow scripts and documentation was assisted by an AI coding assistant (Claude, Anthropic). All design decisions, results and analysis were reviewed by the author, and every reported number comes from the tools and runs recorded in this repository.
+
 ## FPGA Build Requirements
 
 - Vivado 2023.2

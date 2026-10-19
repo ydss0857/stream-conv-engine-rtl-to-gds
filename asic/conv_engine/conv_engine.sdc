@@ -1,7 +1,10 @@
 # Timing constraints for conv_engine hardened as a macro.
 #
-# Based on LibreLane's default scripts/base.sdc (3.0.16), with one change:
-# a realistic MINIMUM input delay for hold analysis.
+# Derived from LibreLane's default scripts/base.sdc (v3.0.16,
+# https://github.com/librelane/librelane), which is licensed under the
+# Apache License, Version 2.0 (http://www.apache.org/licenses/LICENSE-2.0).
+# Modifications: a realistic MINIMUM input delay for hold analysis (below),
+# and removal of commented-out reset-port handling.
 #
 # Why: the default applies one input delay (IO_DELAY_CONSTRAINT % of the
 # period) for both setup and hold, measured from an ideal clock edge at the

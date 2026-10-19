@@ -16,12 +16,12 @@
 <h2>1. The design</h2>
 <figure><img src="fig_architecture.png" alt="Block diagram">
 <figcaption><b>Figure 1.</b> <code>conv_engine</code>: AXI4-Stream video in and out, AXI4-Lite control. Two line buffers form 3×3 windows; two programmable 9-multiplier lanes compute blur, sharpen, Laplacian or Sobel magnitude at one pixel per clock.</figcaption></figure>
-<p>The RTL is verified against a bit-exact Python model: 32 cocotb tests on two simulators, 1.89 M output pixels compared, formal proofs of the interface protocols (SymbiYosys), and 100% line/branch/expression/toggle coverage. The same RTL meets 150 MHz on a Zynq-7020 FPGA. The 80 MHz ASIC target comes from the application: 720p60 video needs 74.25 MHz.</p>
+<p>The RTL is verified against a bit-exact Python model: 32 cocotb [8] tests on two simulators, 1.89 M output pixels compared, formal proofs of the interface protocols (SymbiYosys [9]), and 100% line/branch/expression/toggle coverage. The same RTL meets 150 MHz on a Zynq-7020 FPGA. The 80 MHz ASIC target comes from the application: 720p60 video needs 74.25 MHz.</p>
 
 <h2>2. Implementation setup</h2>
 <table>
 <tr><th>Item</th><th>Setting</th></tr>
-<tr><td>Flow / PDK / library</td><td>LibreLane 3.0.16 (Yosys, OpenROAD, Magic, KLayout, Netgen) · sky130A · <code>sky130_fd_sc_hd</code></td></tr>
+<tr><td>Flow / PDK / library</td><td>LibreLane 3.0.16 [2] (Yosys [4], OpenROAD [3], Magic [5], KLayout [6], Netgen [7]) · sky130A [1] · <code>sky130_fd_sc_hd</code></td></tr>
 <tr><td>Scope</td><td>Macro only (no pad ring); line-buffer width 128 pixels (2 × 128 × 8 bits of flip-flops)</td></tr>
 <tr><td>Clock / I/O constraints</td><td>12.5 ns; input and output delay 20% of the period; minimum input delay raised by 1 ns to model the external driver's clock latency (otherwise every input-to-flop path fails hold at the macro boundary)</td></tr>
 <tr><td>Non-default flow settings</td><td><code>FP_CORE_UTIL</code> 50; <code>PNR_CORNERS</code> = nom_ss_100C_1v60; <code>EXTRA_EXCLUDED_CELLS</code> = clkdlybuf4s* (the resizer was using these delay cells as ordinary buffers)</td></tr>
@@ -74,7 +74,7 @@
 <ol>
 <li><b>Registered, replicated reset:</b> register <code>aresetn</code> at the boundary and give each block its own local reset flop. Also remove resets from flops that don't need one.</li>
 <li><b>Line-buffer read path:</b> bank the line buffers and register the bank select and decoded address one cycle early, so no read-address net spans the array.</li>
-<li><b>SRAM line buffers</b> using sky130's OpenRAM <code>1rw1r</code> macros. By macro dimensions, two 1 KB macros match the flip-flop cell area at about 440 pixels of width. The PDK only provides a typical-corner model for them, though.</li>
+<li><b>SRAM line buffers</b> using sky130's OpenRAM-generated [10] <code>1rw1r</code> macros. By macro dimensions, two 1 KB macros match the flip-flop cell area at about 440 pixels of width. The PDK only provides a typical-corner model for them, though.</li>
 <li><b>Repair settings in small steps</b> (slew margin 20 → 30%, wire-length buffering), after v4 showed that large jumps do not converge.</li>
 </ol>
 
@@ -86,5 +86,22 @@
 <li><b>Sign-off target:</b> LibreLane's default sky130 sign-off checks setup only at the typical corner. For an academic project, is it reasonable to sign off at tt and report the ss Fmax, or should I keep pushing for all-corner closure?</li>
 </ol>
 <p>Thank you for reading. The full configuration, constraints, timing reports for every run, and the RTL are in the repository; I am happy to send any of them directly.</p>
+
+<h2>Acknowledgment</h2>
+<p>Development of the RTL, verification environment, flow scripts and this report was assisted by an AI coding assistant (Claude, Anthropic). All design decisions, results and analysis were reviewed by the author, and every reported number comes from the tools and runs recorded in the repository.</p>
+
+<h2>References</h2>
+<ol class="refs">
+<li>SkyWater Technology and Google, "SkyWater Open Source PDK (sky130)," Apache-2.0. https://github.com/google/skywater-pdk</li>
+<li>FOSSi Foundation, "LibreLane: an infrastructure for implementing chip design flows," v3.0.16. https://github.com/librelane/librelane</li>
+<li>T. Ajayi et al., "Toward an Open-Source Digital Flow: First Learnings from the OpenROAD Project," in <i>Proc. 56th Design Automation Conference (DAC)</i>, 2019.</li>
+<li>C. Wolf, "Yosys Open SYnthesis Suite." https://yosyshq.net/yosys/</li>
+<li>J. K. Ousterhout, G. T. Hamachi, R. N. Mayo, W. S. Scott and G. S. Taylor, "Magic: A VLSI Layout System," in <i>Proc. 21st Design Automation Conference (DAC)</i>, 1984.</li>
+<li>M. Köfferlein, "KLayout." https://www.klayout.de</li>
+<li>R. T. Edwards, "Netgen." http://opencircuitdesign.com/netgen/</li>
+<li>cocotb contributors, "cocotb: coroutine-based cosimulation testbench environment," v2.1. https://www.cocotb.org</li>
+<li>YosysHQ, "SymbiYosys (sby): front-end for Yosys-based formal verification flows." https://github.com/YosysHQ/sby</li>
+<li>M. R. Guthaus, J. E. Stine, S. Ataei, B. Chen, B. Wu and M. Sarwar, "OpenRAM: An Open-Source Memory Compiler," in <i>Proc. IEEE/ACM International Conference on Computer-Aided Design (ICCAD)</i>, 2016.</li>
+</ol>
 </body>
 </html>

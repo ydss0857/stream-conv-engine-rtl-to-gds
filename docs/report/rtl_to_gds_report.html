@@ -12,7 +12,7 @@
 <p class="byline">[Your Name] · B.S. Electrical Engineering, Case Western Reserve University · October 2026 ·
 <a href="https://github.com/ydss0857/stream-conv-engine-rtl-to-gds">github.com/ydss0857/stream-conv-engine-rtl-to-gds</a></p>
 
-<div class="abstract"><p><b>Abstract.</b> I designed a programmable 3×3 image-convolution engine for real-time video in Verilog, with AXI4-Stream video ports and an AXI4-Lite control interface. It supports blur, sharpen, Laplacian, Sobel edge magnitude and thresholded edge maps. It is verified against a bit-exact Python model (1.89 million output pixels compared, including two full 720p frames), with unbounded formal proofs of the skid-buffer, AXI4-Lite and window-generator protocols, 100% line/branch/expression/toggle coverage, and 14 injected bugs, all caught. The same RTL meets 150 MHz on a Zynq-7020 FPGA. Taken through the open-source LibreLane flow on SkyWater sky130, it produces a 0.47 mm² layout with zero DRC and LVS errors. Closing timing there took seven runs and three RTL changes. A sweep of the line-buffer width shows flip-flop line buffers would take 88% of the area at 720p, which quantifies why a production version would use SRAM.</p></div>
+<div class="abstract"><p><b>Abstract.</b> I designed a programmable 3×3 image-convolution engine for real-time video in Verilog, with AXI4-Stream video ports and an AXI4-Lite control interface. It supports blur, sharpen, Laplacian, Sobel edge magnitude and thresholded edge maps. It is verified against a bit-exact Python model (1.89 million output pixels compared, including two full 720p frames), with unbounded formal proofs of the skid-buffer, AXI4-Lite and window-generator protocols, 100% line/branch/expression/toggle coverage, and 14 injected bugs, all caught. The same RTL meets 150 MHz on a Zynq-7020 FPGA. Taken through the open-source LibreLane flow [2] on SkyWater sky130 [1], it produces a 0.47 mm² layout with zero DRC and LVS errors. Closing timing there took seven runs and three RTL changes. A sweep of the line-buffer width shows flip-flop line buffers would take 88% of the area at 720p, which quantifies why a production version would use SRAM.</p></div>
 
 <h2>1. Motivation</h2>
 <p>Image filters are a natural first accelerator: the arithmetic is simple, but streaming them at one pixel per clock forces the real hardware questions. Data arrives row by row, yet each output pixel needs the rows above and below it. The pipeline must also survive backpressure from downstream logic without dropping or duplicating a pixel. I started from an FPGA HDMI pipeline whose only custom block was a 15-line grayscale converter. That block had two latent bugs (pixels lost under backpressure, and a swapped colour channel), which showed me how little "it synthesises" says about correctness. This project is my attempt to do one block properly, from specification to silicon layout.</p>
@@ -21,15 +21,15 @@
 <figure><img src="fig_architecture.png" alt="Block diagram">
 <figcaption><b>Figure 1.</b> <code>conv_engine</code>. Every block-to-block link is AXI4-Stream, with a skid buffer at each boundary. Configuration is latched at the start of each frame, so software can reprogram the filter without tearing.</figcaption></figure>
 <p><b>Window generator.</b> Two line buffers hold the previous two rows. For each incoming pixel at column <i>c</i>, the generator reads column <i>c</i> from both buffers, forms a 3-pixel column, and shifts it into a 3×3 window. Out-of-frame neighbours are replicated from the nearest edge pixel. Because output (<i>r</i>, <i>c</i>) needs input (<i>r</i>+1, <i>c</i>+1), the block runs one line plus one pixel behind its input. It inserts flush cycles at each line and frame end, costing (W+1)(H+1) cycles per frame instead of W·H (+0.2% at 720p).</p>
-<p><b>Datapath.</b> Two independent kernel lanes each multiply nine unsigned 8-bit pixels by signed 8-bit coefficients into a 20-bit accumulator, then apply a rounded arithmetic shift. A combine stage outputs lane 0, |lane 0| or |lane 0| + |lane 1| (the L1 gradient magnitude for Sobel), saturates to 0–255 and optionally thresholds. A fixed-point analysis on real images, done before writing RTL, showed at most 0.5 LSB error against floating point (PSNR 59 dB). Sobel's only deviation comes from the deliberate L1-for-L2 approximation (≤41% on diagonal edges).</p>
+<p><b>Datapath.</b> Two independent kernel lanes each multiply nine unsigned 8-bit pixels by signed 8-bit coefficients into a 20-bit accumulator, then apply a rounded arithmetic shift. Luma is computed with BT.601 weights [13]. A combine stage outputs lane 0, |lane 0| or |lane 0| + |lane 1| (the L1 gradient magnitude for the Sobel operator [12]), saturates to 0–255 and optionally thresholds. A fixed-point analysis on standard test images [14], done before writing RTL, showed at most 0.5 LSB error against floating point (PSNR 59 dB). Sobel's only deviation comes from the deliberate L1-for-L2 approximation (≤41% on diagonal edges).</p>
 <p><b>Flow control.</b> The datapath is a free-running eight-stage pipeline with a 16-entry output FIFO and credit-based admission. A window is accepted only while a FIFO slot is guaranteed, so the pipeline never needs a stall signal. This replaced an earlier design in which one shared clock enable drove about 650 flip-flops; §5 explains why.</p>
 
 <h2>3. Verification</h2>
 <table>
 <tr><th>Method</th><th>Scope</th><th>Result</th></tr>
 <tr><td>Golden model</td><td>Integer Python model with the RTL's exact widths, rounding and saturation</td><td>14 unit tests</td></tr>
-<tr><td>Simulation (cocotb)</td><td>32 tests over 5 testbenches; random backpressure; real images; 2048-wide and 4095-line frames; two 1280×720 frames</td><td>All pass on Icarus and Verilator; 1.89 M pixels bit-exact</td></tr>
-<tr><td>Formal (SymbiYosys)</td><td>Skid buffer data integrity; AXI4-Lite protocol; window-generator handshakes and framing; window contents</td><td>Unbounded proofs (k-induction, IC3/PDR); window contents bounded to 24 cycles</td></tr>
+<tr><td>Simulation (cocotb [8])</td><td>32 tests over 5 testbenches; random backpressure; real images; 2048-wide and 4095-line frames; two 1280×720 frames</td><td>All pass on Icarus [10] and Verilator [9]; 1.89 M pixels bit-exact</td></tr>
+<tr><td>Formal (SymbiYosys [11])</td><td>Skid buffer data integrity; AXI4-Lite protocol; window-generator handshakes and framing; window contents</td><td>Unbounded proofs (k-induction, IC3/PDR); window contents bounded to 24 cycles</td></tr>
 <tr><td>Coverage (Verilator)</td><td>All 8 RTL modules, merged across testbenches</td><td>100% line, branch, expression, toggle (82 waivers, each justified)</td></tr>
 <tr><td>Mutation testing</td><td>14 deliberately injected bugs</td><td>All caught</td></tr>
 </table>
@@ -39,7 +39,7 @@
 <p>Out-of-context synthesis and place and route on the PYNQ-Z2's xc7z020-1 meets 150 MHz with +0.81 ns slack. The design uses 898 LUTs, 1,012 flip-flops, one 36 Kb block RAM (both line buffers, up to 2048 pixels wide) and 18 DSP48 slices, about 2% of the device. Integration exposed a path no block-level run had measured (a combinational RGB-to-luma conversion between blocks), which was fixed by pipelining it.</p>
 
 <h2>5. ASIC implementation on sky130</h2>
-<p>The same RTL (line-buffer width 128) was hardened as a macro with LibreLane 3.0.16 on sky130A using the <code>sky130_fd_sc_hd</code> library. The 80 MHz clock target comes from the requirement: 720p60 needs 74.25 MHz.</p>
+<p>The same RTL (line-buffer width 128) was hardened as a macro with LibreLane 3.0.16 [2] on sky130A [1] using the <code>sky130_fd_sc_hd</code> library. LibreLane drives Yosys [4] for synthesis, OpenROAD [3] for floorplanning through routing and static timing, Magic [5] and KLayout [6] for DRC, and Netgen [7] for LVS. The 80 MHz clock target comes from the requirement: 720p60 needs 74.25 MHz.</p>
 <table>
 <tr><th>Metric</th><th class="n">Result</th><th>Metric</th><th class="n">Result</th></tr>
 <tr><td>Die / std-cell area</td><td class="n">0.468 mm² / 0.283 mm²</td><td>DRC (Magic, KLayout) / LVS</td><td class="n">0 / 0 / 0</td></tr>
@@ -67,7 +67,7 @@
 <h2>6. Power-performance-area study</h2>
 <figure><img src="fig_width_sweep.png" alt="Width sweep">
 <figcaption><b>Figure 4.</b> Line-buffer width sweep, 64 to 512 pixels; all four layouts are DRC/LVS clean. Std-cell area is linear in width (largest residual 0.2%). The slow-corner Fmax falls as the flip-flop array grows; the typical corner stays flat.</figcaption></figure>
-<p><b>Line buffers dominate.</b> Std-cell area ≈ 166,200 µm² + 917 µm² per pixel of width, which is about 57 µm² per stored bit once each bit's flip-flop, write and read multiplexing and buffering are included. Power ≈ 15.7 mW + 0.10 mW per pixel. Extrapolated, flip-flop line buffers would be 88% of the area at 720p (1,280 pixels) and 92% at 2,048, where the FPGA spends a single block RAM. Using the dimensions of sky130's OpenRAM macros, two 1 KB SRAMs break even with flip-flops at about 440 pixels of width (cell area) or about 220 (die area). At 720p, two 2 KB macros would need 0.57 mm² against about 1.2 mm² of flip-flop cells.</p>
+<p><b>Line buffers dominate.</b> Std-cell area ≈ 166,200 µm² + 917 µm² per pixel of width, which is about 57 µm² per stored bit once each bit's flip-flop, write and read multiplexing and buffering are included. Power ≈ 15.7 mW + 0.10 mW per pixel. Extrapolated, flip-flop line buffers would be 88% of the area at 720p (1,280 pixels) and 92% at 2,048, where the FPGA spends a single block RAM. Using the dimensions of sky130's OpenRAM-generated macros [15], two 1 KB SRAMs break even with flip-flops at about 440 pixels of width (cell area) or about 220 (die area). At 720p, two 2 KB macros would need 0.57 mm² against about 1.2 mm² of flip-flop cells.</p>
 <p><b>Cell library.</b> Switching to the high-speed <code>sky130_fd_sc_hs</code> library raises the slow-corner Fmax from 68 to 75 MHz, enough for 720p60 even on slow silicon at 100 °C, at the cost of +33% area and 2.2× power (62.7 mW).</p>
 
 <h2>7. FPGA versus ASIC</h2>
@@ -83,6 +83,29 @@
 <h2>9. Conclusion</h2>
 <p>A single block taken from specification through verification to an FPGA and a sky130 layout taught me more than a broader but shallower design would have. The hardest parts were not the RTL itself but proving it correct, and then learning why a design that met 150 MHz on an FPGA needed three architectural changes to approach 80 MHz in standard cells. I am now most interested in the trade-offs between architecture and energy efficiency that the PPA study only began to expose.</p>
 
-<p class="small">Tools: Icarus Verilog 12, Verilator 5.040, cocotb 2.1, Yosys 0.52, SymbiYosys, Z3, ABC, Vivado 2023.2, LibreLane 3.0.16 (OpenROAD, Magic, KLayout, Netgen), sky130A. Specification, verification and ASIC details: <code>docs/spec.md</code>, <code>docs/verification.md</code>, <code>docs/asic.md</code> in the repository.</p>
+<p class="small">Tools: Icarus Verilog 12, Verilator 5.040, cocotb 2.1, Yosys 0.52, SymbiYosys, Z3, ABC, Vivado 2023.2 [16], LibreLane 3.0.16 (OpenROAD, Magic, KLayout, Netgen), sky130A. Specification, verification and ASIC details: <code>docs/spec.md</code>, <code>docs/verification.md</code>, <code>docs/asic.md</code> in the repository.</p>
+
+<h2>Acknowledgment</h2>
+<p>Development of the RTL, verification environment, flow scripts and this report was assisted by an AI coding assistant (Claude, Anthropic). All design decisions, results and analysis were reviewed by the author, and every reported number comes from the tools and runs recorded in the repository.</p>
+
+<h2>References</h2>
+<ol class="refs">
+<li>SkyWater Technology and Google, "SkyWater Open Source PDK (sky130)," Apache-2.0. https://github.com/google/skywater-pdk</li>
+<li>FOSSi Foundation, "LibreLane: an infrastructure for implementing chip design flows," v3.0.16. https://github.com/librelane/librelane</li>
+<li>T. Ajayi et al., "Toward an Open-Source Digital Flow: First Learnings from the OpenROAD Project," in <i>Proc. 56th Design Automation Conference (DAC)</i>, 2019.</li>
+<li>C. Wolf, "Yosys Open SYnthesis Suite." https://yosyshq.net/yosys/</li>
+<li>J. K. Ousterhout, G. T. Hamachi, R. N. Mayo, W. S. Scott and G. S. Taylor, "Magic: A VLSI Layout System," in <i>Proc. 21st Design Automation Conference (DAC)</i>, 1984.</li>
+<li>M. Köfferlein, "KLayout." https://www.klayout.de</li>
+<li>R. T. Edwards, "Netgen." http://opencircuitdesign.com/netgen/</li>
+<li>cocotb contributors, "cocotb: coroutine-based cosimulation testbench environment," v2.1. https://www.cocotb.org</li>
+<li>W. Snyder et al., "Verilator," v5.040. https://verilator.org</li>
+<li>S. Williams, "Icarus Verilog," v12. https://steveicarus.github.io/iverilog/</li>
+<li>YosysHQ, "SymbiYosys (sby): front-end for Yosys-based formal verification flows." https://github.com/YosysHQ/sby</li>
+<li>I. Sobel and G. Feldman, "A 3×3 Isotropic Gradient Operator for Image Processing," presented at the Stanford Artificial Intelligence Project, 1968.</li>
+<li>ITU-R, Recommendation BT.601, "Studio encoding parameters of digital television for standard 4:3 and wide-screen 16:9 aspect ratios."</li>
+<li>S. van der Walt et al., "scikit-image: image processing in Python," <i>PeerJ</i> 2:e453, 2014. Test images: <i>astronaut</i> (NASA, public domain), <i>camera</i> (CC0, L. Varshney), <i>coffee</i> (CC0, R. Michetti).</li>
+<li>M. R. Guthaus, J. E. Stine, S. Ataei, B. Chen, B. Wu and M. Sarwar, "OpenRAM: An Open-Source Memory Compiler," in <i>Proc. IEEE/ACM International Conference on Computer-Aided Design (ICCAD)</i>, 2016.</li>
+<li>AMD (Xilinx), "Vivado Design Suite," 2023.2. The FPGA HDMI pipeline also uses Digilent's <code>dvi2rgb</code>/<code>rgb2dvi</code> IP (MIT licence). https://github.com/Digilent/vivado-library</li>
+</ol>
 </body>
 </html>
