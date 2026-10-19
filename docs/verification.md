@@ -129,7 +129,7 @@ A check that has never failed proves nothing. Each of these bugs was injected in
 - **Window contents are proven only for small frames** (≤ 3×2, 24 cycles). Full-size frames are covered by simulation: real images, 2048-wide frames, 4095-line frames, and two 720p frames.
 - **The datapath is not formally verified.** Its arithmetic is checked by simulation against the model, including all-extreme coefficient and pixel values; the accumulator width is justified analytically (9 × 128 × 255 < 2¹⁹) and by the model's overflow assertion.
 - **The design uses a single clock domain.** In the FPGA system the AXI4-Lite port will reach the engine through an interconnect clock converter; that crossing is Xilinx IP and isn't verified here.
-- **No hardware test yet.** FPGA results so far come from out-of-context synthesis and place and route (820 LUTs, 824 FFs, 1 BRAM36, 18 DSP48s, +0.62 ns slack at 150 MHz). Running on the PYNQ-Z2 is Phase 4.
+- **No hardware test yet.** FPGA results so far come from out-of-context synthesis and place and route (898 LUTs, 1,012 FFs, 1 BRAM36, 18 DSP48s, +0.81 ns slack at 150 MHz). Running on the PYNQ-Z2 is Phase 4.
 
 ## 7. Reproducing
 

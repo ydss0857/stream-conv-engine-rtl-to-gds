@@ -73,24 +73,25 @@ Same configuration as the baseline; only `MAX_WIDTH` changes.
 
 | `MAX_WIDTH` | 64 | 128 | 256 | 512 |
 |---|---:|---:|---:|---:|
-| Std-cell area (µm²) | 224,438 | 283,407 | 402,292 | _pending_ |
-| Die area (mm²) | 0.382 | 0.468 | 0.638 | _pending_ |
-| Flip-flops | 2,905 | 3,931 | 5,981 | _pending_ |
-| Power, tt @ 80 MHz (mW) | 22.0 | 28.2 | 43.0 | _pending_ |
-| Fmax ss / tt (MHz) | 74 / 122 | 68 / 112 | 65 / 127 | _pending_ |
-| DRC / LVS errors | 0 / 0 | 0 / 0 | 0 / 0 | _pending_ |
+| Std-cell area (µm²) | 224,438 | 283,407 | 402,292 | 635,422 |
+| Die area (mm²) | 0.382 | 0.468 | 0.638 | 0.975 |
+| Flip-flops | 2,905 | 3,931 | 5,981 | 10,079 |
+| Power, tt @ 80 MHz (mW) | 22.0 | 28.2 | 43.0 | 67.5 |
+| Fmax ss / tt (MHz) | 74 / 122 | 68 / 112 | 65 / 127 | 58 / 112 |
+| Setup TNS ss (ns) | −7 | −19 | −52 | −2,431 |
+| DRC / LVS errors | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 |
 
-**Linear fit (64–256):**
-- std-cell area ≈ **165,000 µm² + 926 µm² per pixel of width** (16 stored bits per pixel ⇒ ≈ **58 µm² per stored bit** including its flop, write-enable mux, read mux and buffering);
-- power ≈ 15 mW + 0.11 mW per pixel of width.
+**Linear fit over all four points** (largest residual 0.2 % of area):
+- std-cell area ≈ **166,200 µm² + 917 µm² per pixel of width**; with 16 stored bits per pixel (two lines × 8 bits) that is ≈ **57 µm² per stored bit**, including its flop, write-enable mux, read mux and buffering;
+- power ≈ **15.7 mW + 0.102 mW per pixel of width**.
 
 | Width | Line buffers (fit) | Share of std-cell area |
 |---|---:|---:|
-| 128 | 0.12 mm² | 42 % |
-| 1280 (720p) | 1.19 mm² | 88 % |
-| 2048 (FPGA build) | 1.90 mm² | 92 % |
+| 128 | 0.12 mm² | 41 % |
+| 1280 (720p) | 1.17 mm² | 88 % |
+| 2048 (FPGA build) | 1.88 mm² | 92 % |
 
-Wider line buffers are also slower at ss (74 → 68 → 65 MHz from 64 to 256): the read multiplexers get deeper and the array gets bigger, which is consistent with the long-wire diagnosis in §3.
+Wider line buffers are also slower at ss (74 → 68 → 65 → 58 MHz from 64 to 512), with the slow-corner TNS growing from −7 ns to −2,431 ns: the read multiplexers get deeper and the array gets physically bigger, which is consistent with the long-wire diagnosis in §3. Only the typical corner stays flat (~112–127 MHz).
 
 **Flip-flops versus SRAM.** sky130 ships OpenRAM macros with one read/write port plus one read port, which is exactly what a line buffer needs (one write and one read per pixel):
 
@@ -99,7 +100,7 @@ Wider line buffers are also slower at ss (74 → 68 → 65 MHz from 64 to 256): 
 | `sky130_sram_1kbyte_1rw1r_8x1024_8` | 455 × 446 µm = 0.203 mm² | 1,024 | 0.407 mm² |
 | `sky130_sram_2kbyte_1rw1r_32x512_8` (4 pixels per 32-bit word) | 683 × 417 µm = 0.285 mm² | 2,048 | 0.569 mm² |
 
-Against the fit above, two 1 KB macros (0.407 mm²) equal the flip-flop *cell* area at ≈ **440 pixels** of width, and the *die* area (cells at 50 % utilisation) at ≈ **220 pixels**. At 720p (1280) the 2 KB pair needs 0.57 mm² against ≈ 1.2 mm² of flip-flop cells (≈ 2.4 mm² of die); at 2048, 0.57 against ≈ 1.9 (≈ 3.8). The macro would also remove the long read-address wires that limit ss timing. It was not implemented here: the PDK ships only a typical-corner timing model for these macros, so an SRAM-based block could not be signed off at the slow and fast corners.
+Against the fit above, two 1 KB macros (0.407 mm²) equal the flip-flop *cell* area at ≈ **440 pixels** of width, and the *die* area (cells at 50 % utilisation) at ≈ **220 pixels**. At 720p (1280) the 2 KB pair needs 0.57 mm² against ≈ 1.2 mm² of flip-flop cells (≈ 2.3 mm² of die); at 2048, 0.57 against ≈ 1.9 (≈ 3.8). The macro would also remove the long read-address wires that limit ss timing. It was not implemented here: the PDK ships only a typical-corner timing model for these macros, so an SRAM-based block could not be signed off at the slow and fast corners.
 
 ## 5. Cell library: high density versus high speed
 
@@ -124,7 +125,7 @@ The same RTL (`MAX_WIDTH` 2048 on the FPGA, 128 in silicon):
 
 | | FPGA: Zynq-7020 (xc7z020-1), routed out of context | ASIC: sky130A hd, baseline v7 |
 |---|---|---|
-| Line buffers | 1 BRAM36 (any width up to 2048) | 2,064 flip-flops at width 128 (≈ 42 % of cell area) |
+| Line buffers | 1 BRAM36 (any width up to 2048) | 2,064 flip-flops at width 128 (≈ 41 % of cell area) |
 | Multipliers | 18 DSP48 | 18 multipliers in standard cells |
 | Logic | 898 LUTs, 1,012 FFs | 30,342 cells, 3,931 FFs |
 | Size | ~1.7 % of the device | 0.468 mm² |
