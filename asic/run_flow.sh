@@ -4,8 +4,9 @@
 #
 #   asic/run_flow.sh <tag> [-c KEY=VALUE ...]
 #
-#   e.g. asic/run_flow.sh w128_100mhz
-#        asic/run_flow.sh w256_100mhz -c 'SYNTH_PARAMETERS=["MAX_WIDTH=256","AW=8"]'
+#   e.g. asic/run_flow.sh w128_80mhz
+#        asic/run_flow.sh w256_80mhz -c SYNTH_PARAMETERS=MAX_WIDTH=256,AW=8
+#        (list values are comma-separated, not JSON)
 #
 # Work dir : ~/asic_work/<tag>/   (full run, including GDS; not in git)
 # Results  : asic/results/<tag>/  (metrics, timing/power reports, synth stats, layout render)
