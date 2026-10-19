@@ -34,21 +34,36 @@ cp "$REPO"/asic/conv_engine/{config.yaml,*.sdc} "$WORK/asic/conv_engine/"
 ARGS=""
 for a in "$@"; do ARGS+=" $(printf '%q' "$a")"; done
 
+# RESUME_FROM=<StepId> (e.g. Magic.StreamOut): continue an existing run from
+# that step, starting from the state of the last step that completed, instead
+# of starting over (useful when a run hit the time cap near the end).
+RUN=$WORK/asic/conv_engine/runs/$TAG
+if [ -n "${RESUME_FROM:-}" ]; then
+    LAST=$(for d in "$RUN"/[0-9]*/; do if [ -f "$d/state_out.json" ]; then echo "$d"; fi; done | tail -1)
+    [ -n "$LAST" ] || { echo "no completed step to resume from in $RUN"; exit 1; }
+    echo "resuming $TAG from $RESUME_FROM after $(basename "$LAST")"
+    ARGS+=" --from $RESUME_FROM --with-initial-state ${LAST}state_out.json"
+    MODE=""
+    LOG=$WORK/flow_resume.log
+else
+    MODE=" --overwrite"
+    LOG=$WORK/flow.log
+fi
+
 cd "$LIBRELANE"
 set +e
 timeout --kill-after=2m "$MAX_RUNTIME" \
-    nix-shell --run "cd $WORK/asic/conv_engine && librelane --run-tag $TAG --overwrite$ARGS config.yaml" \
-    > "$WORK/flow.log" 2>&1
+    nix-shell --run "cd $WORK/asic/conv_engine && librelane --run-tag $TAG$MODE$ARGS config.yaml" \
+    > "$LOG" 2>&1
 STATUS=$?
 if [ $STATUS -eq 124 ] || [ $STATUS -eq 137 ]; then
-    echo "TIMEOUT: run exceeded $MAX_RUNTIME and was stopped" | tee -a "$WORK/flow.log"
+    echo "TIMEOUT: run exceeded $MAX_RUNTIME and was stopped" | tee -a "$LOG"
     STATUS=124
 fi
 set -e
 
-RUN=$WORK/asic/conv_engine/runs/$TAG
 mkdir -p "$OUT"
-tail -300 "$WORK/flow.log" > "$OUT/flow.log" 2>/dev/null || true
+tail -300 "$LOG" > "$OUT/flow.log" 2>/dev/null || true
 cp "$RUN/resolved.json" "$OUT/" 2>/dev/null || true
 cp "$RUN/final/metrics.json" "$RUN/final/metrics.csv" "$OUT/" 2>/dev/null || true
 cp "$RUN"/*-yosys-synthesis/reports/stat.rpt "$OUT/synth_stat.rpt" 2>/dev/null || true
