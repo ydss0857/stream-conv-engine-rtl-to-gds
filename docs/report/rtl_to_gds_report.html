@@ -9,7 +9,7 @@
 
 <h1>A Streaming 3×3 Convolution Engine: From Verified RTL to a sky130 Layout</h1>
 <p class="subtitle">Design, verification, FPGA implementation and an open-source ASIC flow with a power-performance-area study</p>
-<p class="byline">[Your Name] · B.S. Electrical Engineering, Case Western Reserve University · October 2026 ·
+<p class="byline">October 2026 ·
 <a href="https://github.com/ydss0857/stream-conv-engine-rtl-to-gds">github.com/ydss0857/stream-conv-engine-rtl-to-gds</a></p>
 
 <div class="abstract"><p><b>Abstract.</b> I designed a programmable 3×3 image-convolution engine for real-time video in Verilog, with AXI4-Stream video ports and an AXI4-Lite control interface. It supports blur, sharpen, Laplacian, Sobel edge magnitude and thresholded edge maps. It is verified against a bit-exact Python model (1.89 million output pixels compared, including two full 720p frames), with unbounded formal proofs of the skid-buffer, AXI4-Lite and window-generator protocols, 100% line/branch/expression/toggle coverage, and 14 injected bugs, all caught. The same RTL meets 150 MHz on a Zynq-7020 FPGA. Taken through the open-source LibreLane flow [2] on SkyWater sky130 [1], it produces a 0.47 mm² layout with zero DRC and LVS errors. Closing timing there took seven runs and three RTL changes. A sweep of the line-buffer width shows flip-flop line buffers would take 88% of the area at 720p, which quantifies why a production version would use SRAM.</p></div>

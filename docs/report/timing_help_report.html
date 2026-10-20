@@ -8,7 +8,7 @@
 <body>
 
 <h1>Slow-Corner Timing Closure of a Streaming Convolution Engine on sky130: Results and Open Questions</h1>
-<p class="byline">[Your Name] · B.S. Electrical Engineering, Case Western Reserve University · October 2026 ·
+<p class="byline">October 2026 ·
 <a href="https://github.com/ydss0857/stream-conv-engine-rtl-to-gds">github.com/ydss0857/stream-conv-engine-rtl-to-gds</a></p>
 
 <div class="ask"><p><b>What I am asking.</b> I implemented a verified 3×3 image-convolution engine on the open-source SkyWater sky130 process. It passes the flow's default sign-off (0 DRC, 0 LVS, hold clean at all corners, setup met at the typical corner), but after seven implementation runs it still misses my 80 MHz target at the slow corner (ss, 100 °C, 1.60 V) by 2.27 ns. I have a diagnosis and a plan (§4–5), but this is my first ASIC flow, and I would value an expert's view on whether my reasoning and next steps are sound. The four questions in §6 are where advice would help most.</p></div>
