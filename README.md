@@ -1,6 +1,8 @@
 # Streaming Convolution Engine: RTL to GDS
 
-A hand-designed, line-buffered 3×3 streaming convolution engine (Sobel / Gaussian) with AXI4-Stream and AXI4-Lite interfaces. It is verified against a bit-exact Python golden model, demonstrated live on HDMI video on a PYNQ-Z2 FPGA, and taken through an open-source ASIC flow to a GDS layout for a PPA study.
+A hand-designed, line-buffered 3×3 streaming convolution engine (Sobel / Gaussian) with AXI4-Stream and AXI4-Lite interfaces. It is verified against a bit-exact Python golden model, implemented on a PYNQ-Z2 FPGA, and taken through an open-source ASIC flow to a GDS layout for a PPA study.
+
+**Technical report:** [rtl_to_gds_report.pdf](rtl_to_gds_report.pdf)
 
 Builds on [Pynq-Z2_VideoP](https://github.com/ydss0857/Pynq-Z2_VideoP), the HDMI grayscale pipeline that serves as the FPGA test harness.
 
@@ -78,7 +80,7 @@ Requires Icarus Verilog 12+ and Python with `cocotb`, `numpy`, `scipy`, `scikit-
 
 ## Reports
 
-- [docs/report/rtl_to_gds_report.pdf](docs/report/rtl_to_gds_report.pdf): technical report covering the full RTL-to-GDS project (5 pages).
+- [rtl_to_gds_report.pdf](rtl_to_gds_report.pdf): technical report covering the full RTL-to-GDS project (5 pages + references). Source: [docs/report/rtl_to_gds_report.html](docs/report/rtl_to_gds_report.html).
 - [docs/report/timing_help_report.pdf](docs/report/timing_help_report.pdf): the open slow-corner timing problem, with data and questions (4 pages).
 - [docs/phase5_open_items.md](docs/phase5_open_items.md): open problems and planned experiments.
 
